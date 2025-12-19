@@ -2,91 +2,93 @@ let audioCtx, analyser, dataArray;
 let isListening = false;
 let detectedBits = "";
 let state = "IDLE";
-let receiveTimer = null;
 
+// 定数定義
 const FREQ_START_MIN = 20800;
 const FREQ_START_MAX = 21200;
-const FREQ_1_TARGET = 20000;
-const FREQ_0_TARGET = 19000;
 
-// UI要素 (ID: register-btn に合わせました)
+// UI要素の取得
 const registerBtn = document.getElementById('register-btn');
+const statusMsg = document.getElementById('status-msg');
 const modal = document.getElementById('completion-modal');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 
+// --- イベントリスナー設定 ---
+
+// 1. 出席登録ボタン
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
-        // 処理中なら無視
+        // 連打防止
         if (registerBtn.classList.contains('is-processing')) return;
         
         try {
             await startMic();
         } catch (e) {
-            alert("マイクエラー: ブラウザの設定を確認してください");
+            alert("マイクエラー: " + e);
             console.error(e);
         }
     });
 }
 
+// 2. モーダルの閉じるボタン
 if (modalCloseBtn) {
     modalCloseBtn.addEventListener('click', () => {
-        modal.classList.remove('active');
-        // UIリセット
-        registerBtn.textContent = '出席登録';
-        registerBtn.classList.remove('is-processing');
+        if(modal) modal.classList.remove('active');
+        resetUI(); // 画面を初期状態に戻す
     });
 }
 
-async function startMic() {
-    // UIを「登録中...」に変更
-    registerBtn.textContent = '信号を探しています...';
-    registerBtn.classList.add('is-processing'); // 収束アニメーション
+// --- 音響処理ロジック ---
 
-    // AudioContext初期化
+async function startMic() {
+    // UIを「受信中」に変更
+    registerBtn.textContent = '信号を探しています...';
+    registerBtn.classList.add('is-processing'); // 波紋アニメ開始
+    if(statusMsg) statusMsg.innerText = "マイク起動中...";
+
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     
-    // バンドパスフィルタ設定
+    // 解析設定
     const source = audioCtx.createMediaStreamSource(stream);
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = 18000;
-
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.5;
-
-    source.connect(filter);
-    filter.connect(analyser);
+    source.connect(analyser);
     
     dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
     isListening = true;
     state = "IDLE";
     updateLoop();
 }
 
-function getFrequencyStrength(targetFreq) {
-    const nyquist = audioCtx.sampleRate / 2;
-    const index = Math.round(targetFreq / nyquist * analyser.fftSize / 2);
+function getDominantFrequency() {
+    analyser.getByteFrequencyData(dataArray);
     let maxVal = 0;
-    for (let i = -2; i <= 2; i++) {
-        const val = dataArray[index + i] || 0;
-        if (val > maxVal) maxVal = val;
+    let maxIndex = 0;
+    const nyquist = audioCtx.sampleRate / 2;
+    // 18kHz以上だけ見る
+    const minIndex = Math.floor(18000 * dataArray.length / nyquist);
+
+    for (let i = minIndex; i < dataArray.length; i++) {
+        if (dataArray[i] > maxVal) {
+            maxVal = dataArray[i];
+            maxIndex = i;
+        }
     }
-    return maxVal;
+    if (maxVal < 50) return 0; // ノイズカット
+    return maxIndex * nyquist / dataArray.length;
 }
 
 function updateLoop() {
     if (!isListening) return;
     requestAnimationFrame(updateLoop);
-    analyser.getByteFrequencyData(dataArray);
+    const freq = getDominantFrequency();
 
-    const startSig = getFrequencyStrength(21000);
-
-    // スタート信号検知
-    if (state === "IDLE" && startSig > 100) {
-        console.log("🚀 スタート信号検知！");
-        registerBtn.textContent = 'データ受信中...';
+    // スタート信号検知 (21kHz付近)
+    if (state === "IDLE" && freq > FREQ_START_MIN && freq < FREQ_START_MAX) {
+        console.log("Start signal detected!");
+        if(statusMsg) statusMsg.innerText = "データ受信中...";
         startReceivingSequence();
     }
 }
@@ -97,61 +99,70 @@ function startReceivingSequence() {
     detectedBits = "";
     let bitCount = 0;
 
-    // タイミング調整 (Start信号検知から1.2秒後に読み始め)
+    // 読み取りロジック
     const readBit = () => {
-        analyser.getByteFrequencyData(dataArray);
-        const str1 = getFrequencyStrength(FREQ_1_TARGET);
-        const str0 = getFrequencyStrength(FREQ_0_TARGET);
+        const freq = getDominantFrequency();
+        let bit = "?";
         
-        // 簡易判定
-        let bit = (str1 > str0) ? "1" : "0";
-        // ノイズ対策: 両方とも弱すぎる場合は無視したいが、今回は強制判定
+        if (freq > 19500 && freq < 20500) bit = "1";      // 20kHz
+        else if (freq > 18500 && freq <= 19500) bit = "0"; // 19kHz
         
-        console.log(`Bit check: 1=${str1}, 0=${str0} -> ${bit}`);
-        detectedBits += bit;
+        console.log(`Bit check: ${Math.round(freq)}Hz -> ${bit}`);
+        
+        if (bit !== "?") detectedBits += bit;
+        
         bitCount++;
-        
         if (bitCount < 4) {
-            setTimeout(readBit, 1000);
+            setTimeout(readBit, 1000); // 次のビットへ
         } else {
             finishReceiving();
         }
     };
     
-    setTimeout(readBit, 1200);
+    // 最初のビットはスタート検知から1.5秒後
+    setTimeout(readBit, 1500);
 }
 
 async function finishReceiving() {
     state = "IDLE";
     isListening = false;
-    
-    registerBtn.textContent = '登録処理中...';
+    registerBtn.textContent = 'サーバー照合中...';
 
-    const finalVal = parseInt(detectedBits, 2);
-    console.log("Result:", finalVal);
+    // 2進数文字列を数値に変換 (例: "1010" -> 10)
+    // エラー回避: 空っぽなら0扱い
+    const val = detectedBits ? parseInt(detectedBits, 2) : 0;
+    console.log("Result:", val);
 
-    // サーバー送信
+    // ★★★ ここでサーバーに送信 ★★★
     try {
         const res = await fetch('/api/check_attend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ otp_value: finalVal })
+            body: JSON.stringify({ otp_value: val })
         });
         const result = await res.json();
 
         if (result.status === "success") {
-            // 成功モーダル表示
-            document.querySelector('.detail-value').innerText = "出席済み"; // 簡易表示
-            modal.classList.add('active');
+            // === 成功！モーダルを表示 ===
+            if (modal) {
+                // 必要ならここでモーダルの中身（名前など）を書き換える
+                // document.querySelector('.detail-value').innerText = "出席済み"; 
+                modal.classList.add('active');
+            }
+            if(statusMsg) statusMsg.innerText = "登録完了";
         } else {
-            alert("出席コードが一致しませんでした。再試行してください。");
-            registerBtn.textContent = '出席登録';
-            registerBtn.classList.remove('is-processing');
+            // 失敗
+            alert("コード不一致: " + result.message);
+            resetUI();
         }
     } catch(e) {
         alert("通信エラー");
-        registerBtn.textContent = '出席登録';
-        registerBtn.classList.remove('is-processing');
+        resetUI();
     }
 }
 
+function resetUI() {
+    registerBtn.textContent = '出席登録';
+    registerBtn.classList.remove('is-processing');
+    if(statusMsg) statusMsg.innerText = "";
+}
