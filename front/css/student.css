@@ -1,0 +1,139 @@
+@charset "UTF-8";
+
+/* --- 受信（収束）アニメーション --- */
+/* 外側からボタンに向かって縮まる波 */
+
+@keyframes signal-receive-in {
+    0% {
+        transform: scale(1.8); /* ボタンより大きい状態から開始 */
+        opacity: 0;
+    }
+    30% {
+        opacity: 0.3; /* 修正: 0.6だと濃すぎるため0.3に変更 */
+    }
+    100% {
+        transform: scale(1); /* ボタンのサイズに収束 */
+        opacity: 0; /* 吸い込まれるように消える */
+    }
+}
+
+.circle-button.is-processing {
+    background-color: var(--color-main);
+    transform: translate(2px, 2px); 
+    box-shadow: 3px 3px 0px var(--color-text);
+}
+
+.circle-button.is-processing::before,
+.circle-button.is-processing::after {
+    content: '';
+    position: absolute;
+    top: -3px; left: -3px; right: -3px; bottom: -3px;
+    background-color: var(--color-main);
+    border-radius: 50%;
+    z-index: -1;
+    opacity: 0;
+}
+
+/* ease-in を使うことで、終わりにかけて加速＝吸い込まれる感を出す */
+.circle-button.is-processing::before {
+    animation: signal-receive-in 1.5s infinite ease-in;
+}
+
+.circle-button.is-processing::after {
+    animation: signal-receive-in 1.5s infinite ease-in 0.75s; /* ずらして開始 */
+}
+
+
+/* --- モーダルウィンドウ --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 40px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.modal-content h2 {
+    font-size: 24px;
+    margin-top: 0;
+    margin-bottom: 30px;
+    color: var(--color-text);
+}
+
+.attendance-details {
+    width: 100%;
+    margin-bottom: 30px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    margin-bottom: 12px;
+}
+
+.detail-label {
+    width: 80px;
+    text-align: right;
+    margin-right: 30px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.detail-value {
+    width: 120px;
+    text-align: left;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.modal-close-btn {
+    background-color: var(--color-main);
+    color: white;
+    border: 2px solid var(--color-text);
+    padding: 10px 40px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    font-family: 'Noto Sans JP', sans-serif;
+    box-shadow: 3px 3px 0px var(--color-text);
+}
+
+.modal-close-btn:hover {
+    filter: brightness(1.05);
+}
+
+.modal-close-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0px var(--color-text);
+}

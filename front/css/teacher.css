@@ -1,0 +1,97 @@
+@charset "UTF-8";
+
+/* --- フォーム要素 --- */
+label {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--color-text);
+}
+
+.select-wrapper {
+    position: relative;
+    width: 250px;
+}
+
+select {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid var(--color-text);
+    border-radius: 10px;
+    font-size: 16px;
+    appearance: none;
+    background-color: white;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: var(--color-text);
+}
+
+.select-wrapper::after {
+    content: 'v';
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%) scaleX(1.2);
+    pointer-events: none;
+    color: var(--color-gray);
+    font-family: sans-serif;
+    font-size: 12px;
+}
+
+.error-message {
+    color: var(--color-warning-red);
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+    height: 20px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.error-message.show {
+    opacity: 1;
+}
+
+/* --- 送信（発信）アニメーション --- */
+/* ボタンから外側へ広がる波 */
+
+@keyframes sonar-wave-out {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1.6);
+        opacity: 0;
+    }
+}
+
+.circle-button.is-processing {
+    background-color: var(--color-main);
+    transform: translate(2px, 2px); 
+    box-shadow: 3px 3px 0px var(--color-text);
+}
+
+.circle-button.is-processing::before,
+.circle-button.is-processing::after {
+    content: '';
+    position: absolute;
+    top: -3px; left: -3px; right: -3px; bottom: -3px;
+    background-color: var(--color-main);
+    border-radius: 50%;
+    z-index: -1;
+    opacity: 0;
+}
+
+.circle-button.is-processing::before {
+    animation: sonar-wave-out 1.5s infinite ease-out;
+}
+
+.circle-button.is-processing::after {
+    animation: sonar-wave-out 1.5s infinite ease-out 0.5s;
+}
+
+@media (max-width: 768px) {
+    .select-wrapper {
+        width: 220px;
+    }
+}
