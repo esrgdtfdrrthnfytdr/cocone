@@ -1,0 +1,96 @@
+:root {
+    --hcs-navy: #00205b;    /* HCS風 濃い紺色 */
+    --hcs-blue: #005bac;    /* アクセント青 */
+    --hcs-gold: #c4a000;    /* アクセント金 */
+    --text-main: #333;
+    --bg-white: #ffffff;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Yu Gothic", sans-serif;
+    background-color: var(--bg-white);
+    color: var(--text-main);
+    margin: 0; padding: 0;
+    height: 100vh;
+    display: flex; flex-direction: column;
+}
+
+/* ヘッダー (紺背景・白文字) */
+header {
+    background-color: var(--hcs-navy);
+    color: white;
+    padding: 15px 20px;
+    display: flex; align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.logo { font-weight: bold; font-size: 1.2rem; margin-right: 10px; letter-spacing: 1px; }
+.sub-title { font-size: 0.9rem; opacity: 0.8; }
+
+/* メイン */
+.container {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 25px;
+}
+
+/* 情報カード (白背景・紺ボーダー) */
+.info-card {
+    background: white; width: 100%; max-width: 320px;
+    padding: 25px; border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 32, 91, 0.1);
+    border-top: 4px solid var(--hcs-navy);
+    margin-bottom: 40px; text-align: left;
+}
+.info-label { font-size: 0.85rem; color: var(--hcs-navy); margin-bottom: 5px; font-weight: bold; }
+.info-value { font-size: 1.1rem; color: var(--text-main); padding-bottom: 15px; }
+.info-value:last-child { padding-bottom: 0; }
+
+/* ボタン (紺ベース) */
+#btn-attend {
+    width: 190px; height: 190px; border-radius: 50%; border: none;
+    background: #e0e0e0; color: var(--hcs-navy);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    position: relative; overflow: hidden;
+}
+
+#btn-attend span { font-size: 2.5rem; margin-bottom: 8px; display: block; color: var(--hcs-navy); transition: color 0.3s; }
+.btn-text { font-size: 1rem; font-weight: bold; transition: color 0.3s; }
+
+/* 状態変化 */
+#btn-attend.listening {
+    background: #e0e0e0;
+}
+#btn-attend.listening span, #btn-attend.listening .btn-text { color: #666; }
+#btn-attend.listening::after {
+    content: ''; position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px;
+    border-radius: 50%; border: 3px solid var(--hcs-navy); opacity: 0;
+    animation: pulse-wave 2s infinite;
+}
+
+#btn-attend.active {
+    background: var(--hcs-navy); color: white;
+    transform: scale(1.05);
+    box-shadow: 0 10px 30px rgba(0, 32, 91, 0.4);
+    animation: pulse-active 1.5s infinite;
+}
+#btn-attend.active span, #btn-attend.active .btn-text { color: white; }
+
+#btn-attend.success {
+    background: var(--hcs-blue); /* または gold */
+    color: white; pointer-events: none; animation: none;
+    box-shadow: none;
+}
+#btn-attend.success span, #btn-attend.success .btn-text { color: white; }
+
+@keyframes pulse-wave { 0% { transform: scale(0.9); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+@keyframes pulse-active { 0% { box-shadow: 0 0 0 0 rgba(0, 32, 91, 0.4); } 70% { box-shadow: 0 0 0 25px rgba(0, 32, 91, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 32, 91, 0); } }
+
+/* メッセージ */
+#status-msg { margin-top: 25px; font-weight: bold; color: var(--hcs-navy); min-height: 1.2em; }
+
+/* フッター */
+footer {
+    padding: 15px; font-size: 0.7rem; color: #888; text-align: center; background: #f9f9f9;
+}
+.debug-info { font-family: monospace; margin-top: 5px; color: #aaa; }

@@ -1,0 +1,101 @@
+:root {
+    --hcs-navy: #00205b;
+    --hcs-blue: #005bac;
+    --hcs-gold: #c4a000;
+    --bg-light: #f4f6f9;
+    --text-dark: #333;
+}
+
+body {
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif;
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; height: 100vh;
+}
+
+/* ヘッダー */
+header {
+    background-color: var(--hcs-navy);
+    color: white;
+    padding: 15px 30px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+.brand { font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; }
+.brand span { color: var(--hcs-gold); }
+.user-info { font-size: 0.9rem; opacity: 0.8; }
+
+/* メインエリア */
+main {
+    flex: 1;
+    display: flex; justify-content: center; align-items: center;
+    padding: 20px;
+}
+
+.control-panel {
+    background: white;
+    width: 100%; max-width: 600px;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 32, 91, 0.1);
+    border-top: 5px solid var(--hcs-navy);
+    text-align: center;
+}
+
+h2 { margin-top: 0; color: var(--hcs-navy); font-size: 1.5rem; margin-bottom: 30px; }
+
+/* ファイル選択エリア */
+.file-drop-zone {
+    border: 2px dashed #ccc;
+    padding: 30px;
+    border-radius: 8px;
+    background: #fafafa;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-bottom: 20px;
+    position: relative;
+}
+.file-drop-zone:hover {
+    border-color: var(--hcs-blue);
+    background: #eef6ff;
+}
+.file-drop-zone input {
+    position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer;
+}
+.file-msg { color: #666; font-weight: bold; }
+.file-sub { font-size: 0.8rem; color: #999; margin-top: 5px; }
+
+/* コントロール類 */
+.controls { display: flex; align-items: center; justify-content: space-between; margin: 20px 0; }
+
+.slider-group { flex: 1; text-align: left; margin-right: 20px; }
+.slider-label { font-size: 0.85rem; font-weight: bold; color: var(--hcs-navy); margin-bottom: 5px; display: block; }
+input[type=range] { width: 100%; cursor: pointer; }
+
+/* 発信ボタン */
+#btn-play {
+    padding: 15px 40px;
+    font-size: 1.1rem; font-weight: bold;
+    color: white; background-color: #ccc;
+    border: none; border-radius: 50px;
+    cursor: not-allowed; transition: all 0.3s;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    min-width: 200px;
+}
+#btn-play.ready {
+    background-color: var(--hcs-blue); cursor: pointer;
+}
+#btn-play.playing {
+    background-color: #dc3545; animation: pulse 2s infinite;
+}
+#btn-play:hover.ready { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 91, 172, 0.3); }
+
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+
+/* モニター */
+.monitor-label { text-align: left; font-size: 0.8rem; color: #666; margin-top: 20px; margin-bottom: 5px; }
+canvas { width: 100%; height: 80px; background: #000; border-radius: 4px; }
+.status-waiting { margin-top: 10px; font-size: 0.9rem; font-weight: bold; color: #ccc; }
+
+footer { text-align: center; padding: 10px; font-size: 0.7rem; color: #999; }
