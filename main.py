@@ -14,7 +14,8 @@ app = FastAPI(
 # --- 静的ファイルの設定 ---
 # HTMLから "css/style.css" ではなく "/static/css/style.css" でアクセスするようにします
 # ディレクトリ構成: templates/static の中身を /static というURLで公開
-app.mount("/static", StaticFiles(directory="templates/static"), name="static")
+# "static" フォルダ（main.pyと同じ階層にあるはず）を探すようにします
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- テンプレートエンジンの設定 ---
 templates = Jinja2Templates(directory="templates")
