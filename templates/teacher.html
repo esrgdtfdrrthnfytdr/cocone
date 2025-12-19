@@ -2,20 +2,39 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>先生用 | 送信機</title>
-    <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/teacher.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Cocone Transmitter</h1>
-        <div class="card">
-            <p>現在のOTP: <strong id="otp-display">---</strong></p>
-            <p>バイナリ: <span id="otp-binary">---</span></p>
-            <button id="btn-send">OTPを発信 (5秒)</button>
+
+    <header>
+        <div class="brand">HCS <span>Attendance</span></div>
+        <div class="user-info">Teacher Mode</div>
+    </header>
+
+    <main>
+        <div class="control-panel">
+            <h2>出席コード発行</h2>
+            
+            <p>生徒に音声でOTPを送信します。</p>
+
+            <div class="otp-display-area">
+                <div class="otp-label">現在のOTP</div>
+                <span id="otp-display" class="otp-number">---</span>
+                <div class="otp-sub">Binary: <span id="otp-binary">----</span></div>
+            </div>
+
+            <button id="btn-send">
+                📡 OTPを発信 (5秒)
+            </button>
+
+            <div id="status">待機中</div>
         </div>
-        <div id="status">待機中</div>
-    </div>
+    </main>
+
+    <footer>&copy; Cocone System</footer>
+
     <script src="/static/js/teacher.js"></script>
 </body>
 </html>
