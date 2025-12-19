@@ -3,6 +3,7 @@ let bgmBuffer = null;
 let bgmSource = null;
 let osc = null;
 let isScanning = false;
+let nextSignalTimer = null; // ループ待機用のタイマー
 
 // 設定
 const BGM_URL = '/static/sounds/bgm.wav'; 
@@ -10,6 +11,7 @@ const FREQ_START = 21000;
 const FREQ_1 = 20000;
 const FREQ_0 = 19000;
 const BIT_DURATION = 1.0;
+const LOOP_GAP_SEC = 2.0; // 信号と信号の間の休憩時間(秒)
 
 // BGM読み込み
 window.addEventListener('load', async () => {
@@ -26,13 +28,13 @@ window.addEventListener('load', async () => {
     }
 });
 
-// 新しいUIのID (submit-btn) を使用
 const submitBtn = document.getElementById('submit-btn');
 const classSelect = document.getElementById('class-select');
 const errorMessage = document.getElementById('error-message');
 
 if (submitBtn) {
     submitBtn.addEventListener('click', async () => {
+        // 送信中なら停止処理へ
         if (isScanning) {
             stopSound();
             return;
@@ -61,9 +63,9 @@ if (submitBtn) {
             const res = await fetch('/api/generate_otp', { method: 'POST' });
             const data = await res.json();
             
-            // 2. UI更新 & 再生
+            // 2. UI更新 & ループ再生開始
             startScanningUI();
-            playMixedSound(data.otp_binary);
+            playMixedSoundLoop(data.otp_binary); // ループ再生関数へ
         } catch(e) {
             alert("通信エラー");
         }
@@ -84,16 +86,28 @@ function stopScanningUI() {
     if(classSelect) classSelect.disabled = false;
 }
 
-function playMixedSound(binaryStr) {
+// BGMを流し始め、信号ループを開始する関数
+function playMixedSoundLoop(binaryStr) {
     if (!bgmBuffer) return;
 
+    // --- A. BGM再生 (流しっぱなし) ---
     bgmSource = audioCtx.createBufferSource();
     bgmSource.buffer = bgmBuffer;
-    bgmSource.loop = true;
+    bgmSource.loop = true; // BGMはずっとループ
     const bgmGain = audioCtx.createGain();
     bgmGain.gain.value = 0.4;
     bgmSource.connect(bgmGain);
     bgmGain.connect(audioCtx.destination);
+    bgmSource.start(0);
+
+    // --- B. 信号ループ開始 ---
+    playSignalRecursive(binaryStr);
+}
+
+// 信号を1回再生し、終わったら次を予約する関数 (再帰)
+function playSignalRecursive(binaryStr) {
+    // 停止ボタンが押されていたら何もしないで終了
+    if (!isScanning) return;
 
     osc = audioCtx.createOscillator();
     const oscGain = audioCtx.createGain();
@@ -102,29 +116,58 @@ function playMixedSound(binaryStr) {
     oscGain.connect(audioCtx.destination);
 
     const startTime = audioCtx.currentTime;
+
+    // 1. スタート信号 (21kHz)
     osc.frequency.setValueAtTime(FREQ_START, startTime);
+
+    // 2. データ信号 (20kHz / 19kHz)
     for (let i = 0; i < binaryStr.length; i++) {
         const bit = binaryStr[i];
         const time = startTime + BIT_DURATION + (i * BIT_DURATION);
         osc.frequency.setValueAtTime((bit === '1' ? FREQ_1 : FREQ_0), time);
     }
 
+    // 終了時間を計算
     const totalDuration = BIT_DURATION + (binaryStr.length * BIT_DURATION);
     const endTime = startTime + totalDuration;
 
-    bgmSource.start(startTime);
     osc.start(startTime);
-
     osc.stop(endTime);
-    bgmSource.stop(endTime + 5.0);
     
+    // 再生が終わったら...
     osc.onended = () => {
-        setTimeout(() => stopSound(), 5000);
+        osc = null; // クリア
+        if (isScanning) {
+            // まだ送信中なら、2秒待ってから自分自身をもう一度呼ぶ
+            console.log(`Loop: Waiting ${LOOP_GAP_SEC}s...`);
+            nextSignalTimer = setTimeout(() => {
+                playSignalRecursive(binaryStr);
+            }, LOOP_GAP_SEC * 1000);
+        }
     };
 }
 
+// 完全停止処理
 function stopSound() {
-    if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
-    if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
+    isScanning = false; // フラグを下ろす
+
+    // 1. 次回の予約があればキャンセル
+    if (nextSignalTimer) {
+        clearTimeout(nextSignalTimer);
+        nextSignalTimer = null;
+    }
+
+    // 2. 現在鳴っている超音波を停止
+    if(osc) { 
+        try{ osc.stop(); }catch(e){} 
+        osc = null; 
+    }
+
+    // 3. BGMを停止
+    if(bgmSource) { 
+        try{ bgmSource.stop(); }catch(e){} 
+        bgmSource = null; 
+    }
+
     stopScanningUI();
 }
