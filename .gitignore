@@ -1,0 +1,16 @@
+# --- システム系の不要ファイル ---
+.DS_Store
+Thumbs.db
+
+# --- Node.js (JavaScript) ---
+node_modules/
+dist/
+.env
+
+# --- Python ---
+venv/
+__pycache__/
+*.pyc
+
+# --- ログファイルなど ---
+*.log
