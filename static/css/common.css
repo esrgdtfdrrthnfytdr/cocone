@@ -24,7 +24,11 @@ body {
 
 /* --- ヘッダー (PC) --- */
 header {
-    margin: 20px 30px;
+    /* 修正箇所: 固定マージンではなく、最大幅と中央寄せを指定 */
+    width: calc(100% - 60px); /* 左右に30pxずつの余白を確保 (100% - 60px) */
+    max-width: 1280px;        /* 最大幅を設定（これ以上横に伸びない） */
+    margin: 20px auto;        /* 上下20px、左右は自動で中央寄せ */
+    
     background-color: var(--color-main);
     height: 80px;
     border-radius: 40px;
@@ -223,7 +227,9 @@ h1 {
 /* レスポンシブ共通 */
 @media (max-width: 768px) {
     header {
-        margin: 20px;
+        /* スマホ時は幅いっぱいまで使うように微調整 */
+        width: calc(100% - 40px); /* 左右20pxずつの余白 */
+        margin: 20px auto;
         padding: 0 25px;
         justify-content: center;
     }
