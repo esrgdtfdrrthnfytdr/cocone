@@ -3,57 +3,92 @@ let isListening = false;
 let detectedBits = "";
 let state = "IDLE";
 
-// 定数定義
-const FREQ_START_MIN = 20800;
-const FREQ_START_MAX = 21200;
+// 定数定義 (iPhoneでも拾いやすい16kHz〜19kHz帯を使用)
+const FREQ_START_MIN = 18500;
+const FREQ_START_MAX = 19500;
 
-// UI要素の取得
+// UI要素
 const registerBtn = document.getElementById('register-btn');
 const statusMsg = document.getElementById('status-msg');
 const modal = document.getElementById('completion-modal');
 const modalCloseBtn = document.getElementById('modal-close-btn');
+const debugFreq = document.getElementById('debug-freq');
+const debugBits = document.getElementById('debug-bits');
 
-// --- イベントリスナー設定 ---
-
-// 1. 出席登録ボタン
+// --- イベントリスナー ---
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
         // 連打防止
         if (registerBtn.classList.contains('is-processing')) return;
         
         try {
+            // iOS対策のため、ここから一気に開始処理を呼ぶ
             await startMic();
         } catch (e) {
             alert("マイクエラー: " + e);
-            console.error(e);
         }
     });
 }
 
-// 2. モーダルの閉じるボタン
 if (modalCloseBtn) {
     modalCloseBtn.addEventListener('click', () => {
         if(modal) modal.classList.remove('active');
-        resetUI(); // 画面を初期状態に戻す
+        resetUI();
     });
 }
 
-// --- 音響処理ロジック ---
-
+// --- 音響処理 ---
 async function startMic() {
-    // UIを「受信中」に変更
     registerBtn.textContent = '信号を探しています...';
-    registerBtn.classList.add('is-processing'); // 波紋アニメ開始
+    registerBtn.classList.add('is-processing');
     if(statusMsg) statusMsg.innerText = "マイク起動中...";
+    if(debugBits) debugBits.innerText = ""; // 履歴クリア
 
+    // 1. AudioContextの作成 (同期的に即座に行う)
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    // ==============================================
+    // 🔥 iOS対策：最強の「無音再生」アンロック処理 🔥
+    // ==============================================
+    // クリックイベント内で即座に音を鳴らすことで、iOSの制限を解除します。
     
-    // 解析設定
-    const source = audioCtx.createMediaStreamSource(stream);
+    // 空の音データを作成して一瞬だけ再生
+    const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
+    const source = audioCtx.createBufferSource();
+    source.buffer = emptyBuffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+
+    // 念押しで resume も呼んでおく
+    if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+    }
+    // ==============================================
+
+    // 2. マイク設定 (iPhoneノイズ除去無効化)
+    const constraints = {
+        audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+        }
+    };
+
+    // マイク許可を求める (ここは待機時間が長くてもOK)
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    source.connect(analyser);
+    analyser.smoothingTimeConstant = 0.5;
+
+    // バンドパスフィルタ (16kHz以上の音だけ通す)
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 16000; 
+
+    mediaSource.connect(filter);
+    filter.connect(analyser);
     
     dataArray = new Uint8Array(analyser.frequencyBinCount);
     
@@ -67,8 +102,8 @@ function getDominantFrequency() {
     let maxVal = 0;
     let maxIndex = 0;
     const nyquist = audioCtx.sampleRate / 2;
-    // 18kHz以上だけ見る
-    const minIndex = Math.floor(18000 * dataArray.length / nyquist);
+    // 16kHz付近からスキャン開始
+    const minIndex = Math.floor(16000 * dataArray.length / nyquist);
 
     for (let i = minIndex; i < dataArray.length; i++) {
         if (dataArray[i] > maxVal) {
@@ -76,19 +111,33 @@ function getDominantFrequency() {
             maxIndex = i;
         }
     }
-    if (maxVal < 50) return 0; // ノイズカット
+    // ノイズカット (閾値30)
+    if (maxVal < 30) return 0; 
+    
     return maxIndex * nyquist / dataArray.length;
 }
 
 function updateLoop() {
     if (!isListening) return;
     requestAnimationFrame(updateLoop);
+    
     const freq = getDominantFrequency();
+    
+    // 可視化: 周波数表示
+    if (debugFreq) {
+        if (freq > 0) {
+            debugFreq.innerText = Math.round(freq) + " Hz";
+            debugFreq.style.color = "#333";
+        } else {
+            debugFreq.innerText = "---";
+            debugFreq.style.color = "#ccc";
+        }
+    }
 
-    // スタート信号検知 (21kHz付近)
+    // スタート信号検知 (19kHz付近)
     if (state === "IDLE" && freq > FREQ_START_MIN && freq < FREQ_START_MAX) {
         console.log("Start signal detected!");
-        if(statusMsg) statusMsg.innerText = "データ受信中...";
+        if(statusMsg) statusMsg.innerText = `受信開始! (${Math.round(freq)}Hz)`;
         startReceivingSequence();
     }
 }
@@ -99,21 +148,29 @@ function startReceivingSequence() {
     detectedBits = "";
     let bitCount = 0;
 
-    // 読み取りロジック
     const readBit = () => {
         const freq = getDominantFrequency();
         let bit = "?";
         
-        if (freq > 19500 && freq < 20500) bit = "1";      // 20kHz
-        else if (freq > 18500 && freq <= 19500) bit = "0"; // 19kHz
+        // 判定ロジック
+        // 1 = 18000Hz (17500-18500)
+        // 0 = 17000Hz (16500-17500)
+        if (freq > 17500 && freq < 18500) bit = "1";      
+        else if (freq > 16500 && freq <= 17500) bit = "0"; 
         
-        console.log(`Bit check: ${Math.round(freq)}Hz -> ${bit}`);
+        // 可視化: 判定結果
+        if (debugBits) {
+            debugBits.innerText += (bit === "?" ? "X" : bit) + " ";
+        }
         
-        if (bit !== "?") detectedBits += bit;
+        // エラー訂正: 不明な場合は0扱い
+        if (bit === "?") bit = "0";
         
+        detectedBits += bit;
         bitCount++;
+        
         if (bitCount < 4) {
-            setTimeout(readBit, 1000); // 次のビットへ
+            setTimeout(readBit, 1000); 
         } else {
             finishReceiving();
         }
@@ -126,14 +183,11 @@ function startReceivingSequence() {
 async function finishReceiving() {
     state = "IDLE";
     isListening = false;
-    registerBtn.textContent = 'サーバー照合中...';
+    registerBtn.textContent = '照合中...';
 
-    // 2進数文字列を数値に変換 (例: "1010" -> 10)
-    // エラー回避: 空っぽなら0扱い
-    const val = detectedBits ? parseInt(detectedBits, 2) : 0;
+    const val = parseInt(detectedBits, 2);
     console.log("Result:", val);
 
-    // ★★★ ここでサーバーに送信 ★★★
     try {
         const res = await fetch('/api/check_attend', {
             method: 'POST',
@@ -143,16 +197,14 @@ async function finishReceiving() {
         const result = await res.json();
 
         if (result.status === "success") {
-            // === 成功！モーダルを表示 ===
-            if (modal) {
-                // 必要ならここでモーダルの中身（名前など）を書き換える
-                // document.querySelector('.detail-value').innerText = "出席済み"; 
-                modal.classList.add('active');
-            }
+            // 成功時
+            if (modal) modal.classList.add('active');
             if(statusMsg) statusMsg.innerText = "登録完了";
+            if(debugBits) debugBits.innerHTML += "<br><span style='color:green; font-weight:bold;'>[OK] 出席完了</span>";
         } else {
-            // 失敗
-            alert("コード不一致: " + result.message);
+            // 失敗時
+            alert(`コード不一致 (受信:${val})`);
+            if(debugBits) debugBits.innerHTML += "<br><span style='color:red; font-weight:bold;'>[NG] 不一致</span>";
             resetUI();
         }
     } catch(e) {

@@ -1,29 +1,58 @@
 let audioCtx;
 let bgmBuffer = null;
 let bgmSource = null;
+let bgmGainNode = null; // ★追加: BGMの音量制御用ノード
 let osc = null;
 let isScanning = false;
 let nextSignalTimer = null;
+let isBgmOn = true; // ★追加: BGMの状態フラグ
 
 // 設定
 const BGM_URL = '/static/sounds/bgm.wav'; 
-const FREQ_START = 21000;
-const FREQ_1 = 20000;
-const FREQ_0 = 19000;
+
+// 周波数はiPhone対策版のまま
+const FREQ_START = 19000; 
+const FREQ_1 = 18000;     
+const FREQ_0 = 17000;     
+
 const BIT_DURATION = 1.0;
 const LOOP_GAP_SEC = 2.0;
+const BGM_VOLUME = 0.4; // BGMの標準音量
 
 // UI要素
 const submitBtn = document.getElementById('submit-btn');
 const classSelect = document.getElementById('class-select');
 const errorMessage = document.getElementById('error-message');
-const volSlider = document.getElementById('signal-volume'); // スライダー
-const volDisplay = document.getElementById('vol-display'); // 数値表示
+const volSlider = document.getElementById('signal-volume');
+const volDisplay = document.getElementById('vol-display');
+const bgmToggleBtn = document.getElementById('bgm-toggle-btn'); // ★追加
 
-// スライダーの数値を表示に反映
+// スライダーの表示更新
 if (volSlider && volDisplay) {
     volSlider.addEventListener('input', (e) => {
         volDisplay.textContent = e.target.value;
+    });
+}
+
+// ★追加: BGM切り替えボタンの動作
+if (bgmToggleBtn) {
+    bgmToggleBtn.addEventListener('click', () => {
+        isBgmOn = !isBgmOn; // フラグ反転
+
+        // ボタンの見た目更新
+        if (isBgmOn) {
+            bgmToggleBtn.textContent = "🎵 BGM: ON";
+            bgmToggleBtn.style.backgroundColor = "#63D2B0"; // 緑
+            bgmToggleBtn.style.opacity = "1";
+        } else {
+            bgmToggleBtn.textContent = "🔇 BGM: OFF";
+            bgmToggleBtn.style.backgroundColor = "#95A5A6"; // グレー
+        }
+
+        // 再生中ならリアルタイムに音量を変更
+        if (bgmGainNode) {
+            bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
+        }
     });
 }
 
@@ -99,10 +128,14 @@ function playMixedSoundLoop(binaryStr) {
     bgmSource = audioCtx.createBufferSource();
     bgmSource.buffer = bgmBuffer;
     bgmSource.loop = true;
-    const bgmGain = audioCtx.createGain();
-    bgmGain.gain.value = 0.4; // BGM音量
-    bgmSource.connect(bgmGain);
-    bgmGain.connect(audioCtx.destination);
+    
+    // GainNodeを作成してグローバル変数に保存
+    bgmGainNode = audioCtx.createGain();
+    // 現在のON/OFF設定に合わせて音量をセット
+    bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
+    
+    bgmSource.connect(bgmGainNode);
+    bgmGainNode.connect(audioCtx.destination);
     bgmSource.start(0);
 
     // 信号ループ開始
@@ -115,6 +148,7 @@ function playSignalRecursive(binaryStr) {
     osc = audioCtx.createOscillator();
     const oscGain = audioCtx.createGain();
     
+    // スライダーの値を取得して適用
     const currentVol = volSlider ? parseFloat(volSlider.value) : 0.1;
     oscGain.gain.value = currentVol; 
     
@@ -140,7 +174,6 @@ function playSignalRecursive(binaryStr) {
     osc.onended = () => {
         osc = null;
         if (isScanning) {
-            // 次のループ予約
             nextSignalTimer = setTimeout(() => {
                 playSignalRecursive(binaryStr);
             }, LOOP_GAP_SEC * 1000);
@@ -156,5 +189,7 @@ function stopSound() {
     }
     if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
     if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
+    
+    bgmGainNode = null; // リセット
     stopScanningUI();
 }
