@@ -1,5 +1,6 @@
-fastapi
-uvicorn
-jinja2
-python-multipart
-pydantic
+Flask
+Flask-SQLAlchemy
+python-dotenv
+psycopg2-binary
+SQLAlchemy
+numpy
