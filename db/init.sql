@@ -3,16 +3,16 @@
 -- ==========================================
 
 -- 名前変更前のテーブルも含めて削除
-DROP TABLE IF EXISTS classes CASCADE;
-DROP TABLE IF EXISTS courses CASCADE;
-DROP TABLE IF EXISTS teachers CASCADE;
-DROP TABLE IF EXISTS students CASCADE;
+-- DROP TABLE IF EXISTS classes CASCADE;
+-- DROP TABLE IF EXISTS courses CASCADE;
+-- DROP TABLE IF EXISTS teachers CASCADE;
+-- DROP TABLE IF EXISTS students CASCADE;
 
--- 関連テーブルも整合性のため削除
-DROP TABLE IF EXISTS attendance_results CASCADE;
-DROP TABLE IF EXISTS attend_requests CASCADE;
-DROP TABLE IF EXISTS student_seat_map CASCADE;
-DROP TABLE IF EXISTS class_sessions CASCADE;
+-- -- 関連テーブルも整合性のため削除
+-- DROP TABLE IF EXISTS attendance_results CASCADE;
+-- DROP TABLE IF EXISTS attend_requests CASCADE;
+-- DROP TABLE IF EXISTS student_seat_map CASCADE;
+-- DROP TABLE IF EXISTS class_sessions CASCADE;
 
 
 -- ==========================================
