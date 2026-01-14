@@ -7,8 +7,8 @@
 -- ------------------------------------------
 INSERT INTO teachers (email, password_hash, name)
 VALUES 
-    ('teacher@hcs.ac.jp', 'password_dummy', 'テスト講師'),
-    ('doi@hcs.ac.jp', 'password_dummy', '土肥(講師)');
+    ('teacher@hcs.ac.jp', 'pass', 'テスト講師'),
+    ('doi@hcs.ac.jp', 'smoke', '土肥(講師)');
 
 -- ------------------------------------------
 -- 2. 授業（科目）データの登録
@@ -29,7 +29,7 @@ VALUES
     -- 髙橋さんのアカウント
     ('s20224033', '20224033-takahashiryo@hcs.ac.jp', 'password_dummy', '髙橋 亮', 'R4A1', 1),
     -- テスト用アカウント
-    ('s99999999', 'student@hcs.ac.jp', 'password_dummy', 'テスト学生', 'R4A1', 99);
+    ('s99999999', 'student@hcs.ac.jp', 'pass', 'テスト学生', 'R4A1', 99);
 
 -- ==========================================
 -- 確認用
