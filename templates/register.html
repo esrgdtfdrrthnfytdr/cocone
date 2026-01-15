@@ -49,7 +49,7 @@
             <div id="register-error-msg" class="page-error-area"></div>
 
             <div class="form-area">
-                <div class="select-group">
+                <div class="form-group">
                     <label for="class-select">クラス</label>
                     <div class="select-wrapper">
                         <select id="class-select">
@@ -60,13 +60,13 @@
                     </div>
                 </div>
 
-                <button id="start-btn" class="circle-button ripple-effect">
-                    出席<br>開始
+                <button id="start-btn" class="register-btn">
+                    出席を開始する
                 </button>
             </div>
             
             <div id="active-status" class="active-status" style="display: none;">
-                <p class="broadcasting-text">出席登録を受付中...</p>
+                <p class="status-text">出席登録を受付中...</p>
                 <button id="stop-btn" class="stop-btn">終了する</button>
             </div>
         </div>
@@ -74,6 +74,5 @@
 
     <script src="../static/js/common.js"></script>
     <script src="../static/js/register.js"></script>
-    <script src="../static/js/student.js"></script>
 </body>
 </html>

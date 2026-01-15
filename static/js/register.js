@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     
+    // IDでの取得に変更はありませんが、念のため確認
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const classSelect = document.getElementById('class-select');
@@ -33,8 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const selectedClass = classSelect ? classSelect.value : '';
 
-            // 修正: 科目名のバリデーションは削除しました
-            // クラス選択のみチェック（もしクラス選択も不要ならここも削除可能です）
+            // 科目バリデーションは削除済み。クラスのみチェック。
             if (!selectedClass) {
                 showError('※ クラスを選択してください');
                 return;
@@ -44,8 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // フォームを隠して、発信中ステータスを表示
             formArea.style.display = 'none';
             activeStatus.style.display = 'flex';
-            
-            // alert('出席登録を開始しました（ビーコン発信中）');
         });
     }
 
