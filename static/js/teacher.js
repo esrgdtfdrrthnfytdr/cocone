@@ -1,197 +1,149 @@
-let audioCtx;
-let bgmBuffer = null;
-let bgmSource = null;
-let bgmGainNode = null;
-let osc = null;
-let isScanning = false;
-let nextSignalTimer = null;
-let isBgmOn = true;
+document.addEventListener('DOMContentLoaded', () => {
+    // ==========================================
+    // 1. DOM要素の取得
+    // ==========================================
+    const startBtn = document.getElementById('submit-btn'); // 出席開始ボタン
+    const stopBtn = document.getElementById('stop-btn');    // 停止ボタン
+    const classSelect = document.getElementById('class-select'); // クラス選択プルダウン
+    
+    const otpNumberDisplay = document.getElementById('otp-number'); // 数字表示エリア
+    const statusMessage = document.getElementById('status-message'); // ステータス表示
 
-// 設定
-const BGM_URL = '/static/sounds/bgm.wav'; 
+    // 音響通信用の変数
+    let isPlaying = false;
+    let sequenceLoop = null;
+    let synth = null;
 
-// 周波数設定
-const FREQ_START = 19000; 
-const FREQ_1 = 18000;     
-const FREQ_0 = 17000;     
+    // ==========================================
+    // 2. 音響通信の設定 (Tone.js)
+    // ==========================================
+    // 4ビットの0/1に対応する周波数 + マーカー音
+    const FREQ_MARKER = 18000; 
+    const FREQ_BIT_0  = 18500; 
+    const FREQ_BIT_1  = 19000; 
+    const DURATION    = 0.1; // 1音の長さ(秒)
 
-const BIT_DURATION = 1.0;
-const LOOP_GAP_SEC = 2.0;
-const BGM_VOLUME = 0.4;
-
-// UI要素 (class-select ではなく course-select に変更)
-const submitBtn = document.getElementById('submit-btn');
-const courseSelect = document.getElementById('course-select');
-const errorMessage = document.getElementById('error-message');
-const volSlider = document.getElementById('signal-volume');
-const volDisplay = document.getElementById('vol-display');
-const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
-
-// スライダーの表示更新
-if (volSlider && volDisplay) {
-    volSlider.addEventListener('input', (e) => {
-        volDisplay.textContent = e.target.value;
-    });
-}
-
-// BGM切り替えボタン
-if (bgmToggleBtn) {
-    bgmToggleBtn.addEventListener('click', () => {
-        isBgmOn = !isBgmOn;
-        if (isBgmOn) {
-            bgmToggleBtn.textContent = "🎵 BGM: ON";
-            bgmToggleBtn.style.backgroundColor = "#63D2B0";
-            bgmToggleBtn.style.opacity = "1";
-        } else {
-            bgmToggleBtn.textContent = "🔇 BGM: OFF";
-            bgmToggleBtn.style.backgroundColor = "#95A5A6";
+    // 音の再生準備
+    async function initAudio() {
+        await Tone.start();
+        if (!synth) {
+            synth = new Tone.Synth().toDestination();
+            synth.volume.value = -10; // 音量調整
         }
-        if (bgmGainNode) {
-            bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-        }
-    });
-}
-
-// BGM読み込み
-window.addEventListener('load', async () => {
-    try {
-        window.AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-        
-        const response = await fetch(BGM_URL);
-        const arrayBuffer = await response.arrayBuffer();
-        bgmBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        console.log("BGM Ready");
-    } catch (e) {
-        console.error("BGM Load Error:", e);
     }
-});
 
-if (submitBtn) {
-    submitBtn.addEventListener('click', async () => {
-        if (isScanning) {
-            stopSound();
-            return;
-        }
+    // OTP(2進数文字列)を音に変換してループ再生
+    function playSoundPattern(binaryStr) {
+        // パターン作成: [マーカー, bit0, bit1, bit2, bit3, 休止...]
+        const pattern = [];
         
-        // 科目が選択されているかチェック
-        const selectedValue = courseSelect ? courseSelect.value : null;
-        if (!selectedValue) {
-            if(errorMessage) {
-                errorMessage.textContent = '科目を選択してください';
-                errorMessage.classList.add('show');
-            }
-            return;
-        }
-        if(errorMessage) {
-            errorMessage.textContent = '';
-            errorMessage.classList.remove('show');
+        // 1. 開始マーカー
+        pattern.push({ time: 0, freq: FREQ_MARKER });
+
+        // 2. データビット (4bit)
+        for (let i = 0; i < 4; i++) {
+            const bit = binaryStr[i];
+            const freq = (bit === '1') ? FREQ_BIT_1 : FREQ_BIT_0;
+            pattern.push({ time: (i + 1) * DURATION, freq: freq });
         }
 
-        if (audioCtx && audioCtx.state === 'suspended') {
-            await audioCtx.resume();
+        // 3. ループ設定
+        const totalDuration = (1 + 4) * DURATION + 0.5; // マーカー+4bit+少し休止
+
+        sequenceLoop = new Tone.Loop((time) => {
+            // マーカー再生
+            synth.triggerAttackRelease(FREQ_MARKER, DURATION, time);
+
+            // 各ビット再生
+            for (let i = 0; i < 4; i++) {
+                const bit = binaryStr[i];
+                const freq = (bit === '1') ? FREQ_BIT_1 : FREQ_BIT_0;
+                const noteTime = time + ((i + 1) * DURATION);
+                synth.triggerAttackRelease(freq, DURATION, noteTime);
+            }
+        }, totalDuration).start(0);
+
+        Tone.Transport.start();
+        isPlaying = true;
+    }
+
+    // ==========================================
+    // 3. イベントリスナー (ボタン操作)
+    // ==========================================
+
+    // ▼ 出席開始ボタン
+    startBtn.addEventListener('click', async () => {
+        // (1) クラス選択チェック
+        const classId = classSelect.value;
+        if (!classId) {
+            alert("クラスを選択してください！");
+            return;
         }
+
+        // (2) オーディオ初期化
+        await initAudio();
+
+        // (3) ボタン状態の切り替え
+        startBtn.disabled = true;
+        classSelect.disabled = true; // 途中でクラスを変えられないようにする
+        stopBtn.disabled = false;
+        statusMessage.textContent = "出席受付中...音声を送信しています";
+        statusMessage.style.color = "red";
 
         try {
-            // APIへPOST送信 (course_id を含める)
+            // (4) APIへOTP生成リクエスト (クラスIDを送信)
             const res = await fetch('/api/generate_otp', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ course_id: parseInt(selectedValue) })
+                body: JSON.stringify({ class_id: classId }) // ★ここでIDを送る
             });
-            
+
             if (!res.ok) {
-                throw new Error("Server Response Error");
+                throw new Error("API Error");
             }
 
             const data = await res.json();
-            
-            startScanningUI();
-            playMixedSoundLoop(data.otp_binary);
-        } catch(e) {
-            console.error(e);
-            alert("通信エラーが発生しました");
+            const otpDisplay = data.otp_display; // 画面表示用 (例: 10)
+            const otpBinary  = data.otp_binary;  // 音響用 (例: "1010")
+
+            // (5) 画面更新
+            otpNumberDisplay.textContent = otpDisplay;
+
+            // (6) 音声送信開始
+            console.log(`Playing Sound for OTP: ${otpDisplay} (${otpBinary})`);
+            playSoundPattern(otpBinary);
+
+        } catch (err) {
+            console.error(err);
+            alert("エラーが発生しました");
+            // エラー時はリセット
+            stopAttendance();
         }
     });
-}
 
-function startScanningUI() {
-    isScanning = true;
-    submitBtn.textContent = '停止する';
-    submitBtn.classList.add('is-processing');
-    if(courseSelect) courseSelect.disabled = true;
-}
+    // ▼ 停止ボタン
+    stopBtn.addEventListener('click', () => {
+        stopAttendance();
+    });
 
-function stopScanningUI() {
-    isScanning = false;
-    submitBtn.textContent = '出席確認';
-    submitBtn.classList.remove('is-processing');
-    if(courseSelect) courseSelect.disabled = false;
-}
-
-function playMixedSoundLoop(binaryStr) {
-    if (!bgmBuffer) return;
-
-    bgmSource = audioCtx.createBufferSource();
-    bgmSource.buffer = bgmBuffer;
-    bgmSource.loop = true;
-    
-    bgmGainNode = audioCtx.createGain();
-    bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-    
-    bgmSource.connect(bgmGainNode);
-    bgmGainNode.connect(audioCtx.destination);
-    bgmSource.start(0);
-
-    playSignalRecursive(binaryStr);
-}
-
-function playSignalRecursive(binaryStr) {
-    if (!isScanning) return;
-
-    osc = audioCtx.createOscillator();
-    const oscGain = audioCtx.createGain();
-    
-    const currentVol = volSlider ? parseFloat(volSlider.value) : 0.1;
-    oscGain.gain.value = currentVol; 
-    
-    osc.connect(oscGain);
-    oscGain.connect(audioCtx.destination);
-
-    const startTime = audioCtx.currentTime;
-
-    osc.frequency.setValueAtTime(FREQ_START, startTime);
-    for (let i = 0; i < binaryStr.length; i++) {
-        const bit = binaryStr[i];
-        const time = startTime + BIT_DURATION + (i * BIT_DURATION);
-        osc.frequency.setValueAtTime((bit === '1' ? FREQ_1 : FREQ_0), time);
-    }
-
-    const totalDuration = BIT_DURATION + (binaryStr.length * BIT_DURATION);
-    const endTime = startTime + totalDuration;
-
-    osc.start(startTime);
-    osc.stop(endTime);
-    
-    osc.onended = () => {
-        osc = null;
-        if (isScanning) {
-            nextSignalTimer = setTimeout(() => {
-                playSignalRecursive(binaryStr);
-            }, LOOP_GAP_SEC * 1000);
+    // 停止処理
+    function stopAttendance() {
+        // 音を止める
+        if (sequenceLoop) {
+            sequenceLoop.stop();
+            sequenceLoop.dispose();
+            sequenceLoop = null;
         }
-    };
-}
+        Tone.Transport.stop();
+        isPlaying = false;
 
-function stopSound() {
-    isScanning = false;
-    if (nextSignalTimer) {
-        clearTimeout(nextSignalTimer);
-        nextSignalTimer = null;
+        // UIを元に戻す
+        startBtn.disabled = false;
+        classSelect.disabled = false;
+        stopBtn.disabled = true;
+        
+        statusMessage.textContent = "待機中";
+        statusMessage.style.color = "#333";
+        otpNumberDisplay.textContent = "----";
     }
-    if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
-    if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
-    
-    bgmGainNode = null;
-    stopScanningUI();
-}
+});
