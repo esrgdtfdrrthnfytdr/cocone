@@ -10,12 +10,9 @@ from dotenv import load_dotenv
 # Windowsでの文字化け対策
 sys.stdout.reconfigure(encoding='utf-8')
 
-# .envファイルを読み込む
 load_dotenv()
 
 app = Flask(__name__)
-
-# セッション情報（ログイン状態）を管理するための秘密鍵
 app.secret_key = 'secret_key_cocone_dummy' 
 
 # データベース設定
@@ -28,10 +25,8 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 db = SQLAlchemy(app)
 
 # ==================================================
-# ルーティング (画面遷移)
+# 1. ログイン画面
 # ==================================================
-
-# 1. ログイン画面 (トップページ)
 @app.route('/', methods=['GET', 'POST'])
 def index():
     message = ""
@@ -39,91 +34,72 @@ def index():
         email = request.form.get('email')
         password = request.form.get('password')
 
-        # --- A. 先生テーブルを検索 ---
+        # 先生テーブル検索
         sql_teacher = text("SELECT * FROM teachers WHERE email = :e")
         teacher = db.session.execute(sql_teacher, {"e": email}).fetchone()
 
-        if teacher:
-            # パスワードチェック (テスト用なので平文チェックにしています)
-            # if check_password_hash(teacher.password_hash, password):
-            if teacher.password_hash == password: 
-                session['user_role'] = 'teacher'
-                session['user_id'] = teacher.teacher_id
-                session['user_name'] = teacher.name
-                return redirect(url_for('teacher_page'))
+        if teacher and teacher.password_hash == password:
+            session['user_role'] = 'teacher'
+            session['user_id'] = teacher.teacher_id
+            session['user_name'] = teacher.name
+            return redirect(url_for('teacher_page'))
         
-        # --- B. 生徒テーブルを検索 ---
+        # 生徒テーブル検索
         sql_student = text("SELECT * FROM students WHERE email = :e")
         student = db.session.execute(sql_student, {"e": email}).fetchone()
 
-        if student:
-            if student.password_hash == password:
-                session['user_role'] = 'student'
-                session['user_id'] = student.student_number
-                session['user_name'] = student.name
-                session['homeroom'] = student.homeroom_class
-                return redirect(url_for('student_page'))
+        if student and student.password_hash == password:
+            session['user_role'] = 'student'
+            session['user_id'] = student.student_number
+            session['user_name'] = student.name
+            session['homeroom'] = student.homeroom_class
+            return redirect(url_for('student_page'))
 
-        message = "ログイン失敗: メールアドレスかパスワードが違います"
+        message = "ログイン失敗"
 
-    # 簡易ログインフォームを表示
-    login_html = f"""
+    return f"""
     <html>
-    <head><title>ログイン</title></head>
-    <body style="text-align:center; padding-top:50px; font-family:sans-serif;">
+    <body style="text-align:center; padding-top:50px;">
         <h1>Cocone ログイン</h1>
         <p style="color:red;">{message}</p>
         <form method="POST">
-            <input type="text" name="email" placeholder="メールアドレス" style="padding:10px; width:300px;"><br><br>
-            <input type="password" name="password" placeholder="パスワード" style="padding:10px; width:300px;"><br><br>
-            <button type="submit" style="padding:10px 30px;">ログイン</button>
+            <input type="text" name="email" placeholder="メールアドレス"><br><br>
+            <input type="password" name="password" placeholder="パスワード"><br><br>
+            <button type="submit">ログイン</button>
         </form>
-        <p>【テストアカウント】<br>
-           先生: doi@hcs.ac.jp / smoke <br>
-           生徒: student@hcs.ac.jp / pass
-        </p>
+        <p>先生: doi@hcs.ac.jp / smoke<br>生徒: student@hcs.ac.jp/ pass</p>
     </body>
     </html>
     """
-    return login_html
 
-# 2. 先生用ページ (RollCall)
+# ==================================================
+# 2. 先生用ページ (修正箇所)
+# ==================================================
 @app.route('/teacher')
 def teacher_page():
-    # ログインチェック
     if session.get('user_role') != 'teacher':
         return redirect(url_for('index'))
 
     teacher_id = session['user_id']
     
-    # ★修正箇所: courses ではなく classes テーブルから担当クラスを取得
+    # ★DBから担当クラスを取得して画面に渡す
     sql = text("SELECT * FROM classes WHERE teacher_id = :tid")
     my_classes = db.session.execute(sql, {"tid": teacher_id}).fetchall()
 
-    # HTMLにクラスリスト(classes)を渡す
     return render_template('rollCall.html', teacher_name=session['user_name'], classes=my_classes)
 
-# 3. 生徒用ページ (Register)
+# ==================================================
+# 3. 生徒用ページ
+# ==================================================
 @app.route('/student')
 def student_page():
-    # ログインチェック
     if session.get('user_role') != 'student':
         return redirect(url_for('index'))
-
     return render_template('register.html', student_name=session['user_name'], homeroom=session['homeroom'])
 
-# 4. ログアウト
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
-
-
 # ==================================================
-# API (非同期通信)
+# 4. 出席開始API (修正箇所)
 # ==================================================
-
-# OTP生成 API (先生が実行)
 @app.route('/api/generate_otp', methods=['POST'])
 def generate_otp():
     if session.get('user_role') != 'teacher':
@@ -132,33 +108,28 @@ def generate_otp():
     val = random.randint(0, 15)
     binary_str = format(val, '04b')
     
-    # ★修正箇所: リクエストから class_id を取得
+    # ★JSから送られてきた class_id を受け取る
     data = request.json
-    class_id = data.get('class_id') if data else None
+    class_id = data.get('class_id')
 
-    # ★修正箇所: DB保存も class_sessions テーブルへ (class_idを使用)
+    # ★class_sessionsテーブルに保存
     sql = text("""
         INSERT INTO class_sessions (class_id, date, sound_token)
         VALUES (:cid, :date, :token)
         RETURNING session_id
     """)
-    
     current_date = datetime.date.today().strftime('%Y-%m-%d')
     
     try:
-        result = db.session.execute(sql, {
-            "cid": class_id, 
-            "date": current_date,
-            "token": str(val)
-        })
+        db.session.execute(sql, {"cid": class_id, "date": current_date, "token": str(val)})
         db.session.commit()
         return jsonify({"otp_binary": binary_str, "otp_display": val})
-        
     except Exception as e:
-        print(f"❌ DBエラー: {e}")
         return jsonify({"error": str(e)}), 500
 
-# 出席確認 API (学生が実行)
+# ==================================================
+# 5. 出席確認API (生徒)
+# ==================================================
 @app.route('/api/check_attend', methods=['POST'])
 def check_attend():
     if session.get('user_role') != 'student':
@@ -166,41 +137,25 @@ def check_attend():
 
     data = request.json
     student_otp = data.get('otp_value')
-    student_id = session['user_id'] # セッションから学籍番号を取得
+    student_id = session['user_id']
 
-    print(f"📝 受信: 生徒OTP={student_otp} (Student: {student_id})")
-
-    # 最新の授業セッションを取得
-    sql_get_session = text("""
-        SELECT session_id, sound_token 
-        FROM class_sessions 
-        ORDER BY session_id DESC 
-        LIMIT 1
-    """)
-    
+    sql_get_session = text("SELECT session_id, sound_token FROM class_sessions ORDER BY session_id DESC LIMIT 1")
     session_row = db.session.execute(sql_get_session).fetchone()
     
     if not session_row:
         return jsonify({"status": "error", "message": "授業が開催されていません"})
     
-    current_session_id = session_row[0]
-    correct_otp = int(session_row[1])
+    current_session_id, correct_otp = session_row[0], int(session_row[1])
     
     if student_otp == correct_otp:
-        # 重複チェックなしで登録
-        sql_insert = text("""
-            INSERT INTO attendance_results (session_id, student_number, status, note)
-            VALUES (:sess_id, :stu_num, '出席', 'アプリ登録')
-        """)
+        # 重複チェックは簡易的に省略
+        sql_insert = text("INSERT INTO attendance_results (session_id, student_number, status, note) VALUES (:sess, :stu, '出席', 'アプリ登録')")
         try:
-            db.session.execute(sql_insert, {
-                "sess_id": current_session_id,
-                "stu_num": student_id
-            })
+            db.session.execute(sql_insert, {"sess": current_session_id, "stu": student_id})
             db.session.commit()
             return jsonify({"status": "success", "message": "出席完了"})
-        except Exception as e:
-            return jsonify({"status": "error", "message": "DBエラー"})
+        except:
+            return jsonify({"status": "error", "message": "登録済みかエラー"})
     else:
         return jsonify({"status": "error", "message": "コード不一致"})
 
