@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>出席確認｜cocone</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/teacher.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/teacher.css') }}">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
@@ -15,10 +15,10 @@
             <span></span><span></span><span></span>
         </button>
         <div class="logo-container">
-            <img src="{{ url_for('static', filename='image/cocone_white_logo.png') }}" alt="cocone">
+            <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone">
         </div>
         <nav class="pc-nav">
-            {% if session.get('user_role') == 'teacher' %}
+            {% if request.session.get('user_role') == 'teacher' %}
                 <a href="/register">出席登録</a>
                 <a href="/attendanceFilter">出欠席絞り込み</a>
                 <a href="/userManagement">ユーザー管理</a>
@@ -31,10 +31,10 @@
         <div class="menu-background">
             <div class="menu-header">
                 <button id="close-btn" class="close-btn">×</button>
-                <img src="{{ url_for('static', filename='image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
+                <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
             </div>
             <nav class="mobile-nav-links">
-                {% if session.get('user_role') == 'teacher' %}
+                {% if request.session.get('user_role') == 'teacher' %}
                     <a href="/register">出席登録</a>
                     <a href="/attendanceFilter">出欠席絞り込み</a>
                     <a href="/userManagement">ユーザー管理</a>
@@ -70,7 +70,7 @@
         </div>
     </main>
 
-    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/teacher.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/teacher.js') }}"></script>
 </body>
 </html>
