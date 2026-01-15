@@ -13,24 +13,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. SFTPでファイル転送（ここが修正ポイントです）
-      - name: SFTP Upload
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      # 2. Rsyncで高速転送（除外設定が確実に効きます）
+      - name: Deploy to Server
+        uses: easingthemes/ssh-deploy@v5.1.0
         with:
-          username: ${{ secrets.SFTP_USERNAME }}
-          server: ${{ secrets.SFTP_HOST }}
-          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SFTP_PORT }} 
+          # SSHキーと接続情報
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SFTP_HOST }}
+          REMOTE_USER: ${{ secrets.SFTP_USERNAME }}
+          REMOTE_PORT: ${{ secrets.SFTP_PORT }}
           
-          local_path: './'
-          remote_path: '/root/cocone'
+          # 転送元と転送先
+          SOURCE: "./"
+          TARGET: "/root/cocone/"
           
-          # サーバー上の不要ファイルを削除して同期する
-          delete_remote_files: true
+          # 除外ファイル（.gitなどはここで弾かれます）
+          EXCLUDE: "/.git/, /.github/, /env/, /.env, /__pycache__/"
           
-          # ★修正: .gitフォルダやGit関連ファイルを除外する設定を追加しました
-          # これで大量のファイル転送が防げます
-          args: '--exclude=.git* --exclude=.github* --exclude=__pycache__ --exclude=env --exclude=.env'
+          # サーバー上の不要なファイルを削除するか（true推奨）
+          ARGS: "-rltgoDzvO --delete"
 
       # 3. SSHで接続してライブラリ更新と再起動
       - name: Install Requirements & Restart Service
@@ -45,6 +46,7 @@ jobs:
             
             # 仮想環境に入ってライブラリ更新
             source env/bin/activate
+            # requirements.txtが更新された時だけインストール
             pip install -r requirements.txt
             
             # サービス再起動
