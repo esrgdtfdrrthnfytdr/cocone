@@ -28,7 +28,7 @@ jobs:
           TARGET: "/root/cocone/"
           
           # 除外ファイル（.gitなどはここで弾かれます）
-          EXCLUDE: "/.git/, /.github/, /env/, /.env, /__pycache__/"
+          EXCLUDE: "/.git/, /.github/, /env/, /.env, /__pycache__/,*.wav"
           
           # サーバー上の不要なファイルを削除するか（true推奨）
           ARGS: "-rltgoDzvO --delete"
