@@ -9,11 +9,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. GitHubから最新コードを取得
+      # 1. コードを取得
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. SFTPでファイル転送
+      # 2. SFTPでファイル転送（ここが修正ポイントです）
       - name: SFTP Upload
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
@@ -23,14 +23,14 @@ jobs:
           port: ${{ secrets.SFTP_PORT }} 
           
           local_path: './'
-          remote_path: '/root/cocone' # ← あなたの環境に合わせて修正しました
+          remote_path: '/root/cocone'
           
-          # 重要: ローカルに無いファイルをサーバーから消す設定
+          # サーバー上の不要ファイルを削除して同期する
           delete_remote_files: true
           
-          # 転送除外設定
-          # .git系, Pythonキャッシュ, 仮想環境(env), サーバー上の設定ファイル(.env) は消さない・送らない
-          args: '--exclude=.git* --exclude=__pycache__ --exclude=env --exclude=.env'
+          # ★修正: .gitフォルダやGit関連ファイルを除外する設定を追加しました
+          # これで大量のファイル転送が防げます
+          args: '--exclude=.git* --exclude=.github* --exclude=__pycache__ --exclude=env --exclude=.env'
 
       # 3. SSHで接続してライブラリ更新と再起動
       - name: Install Requirements & Restart Service
@@ -43,6 +43,9 @@ jobs:
           script: |
             cd /root/cocone
             
+            # 仮想環境に入ってライブラリ更新
+            source env/bin/activate
             pip install -r requirements.txt
-
+            
+            # サービス再起動
             systemctl restart cocone
