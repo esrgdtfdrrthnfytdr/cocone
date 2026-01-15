@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>出席確認｜cocone</title>
-    <link rel="stylesheet" href="/static/css/common.css">
-    <link rel="stylesheet" href="/static/css/teacher.css">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/teacher.css') }}">
 </head>
 <body>
     <header>
@@ -13,13 +13,15 @@
             <span></span><span></span><span></span>
         </button>
         <div class="logo-container">
-            <img src="/static/image/cocone_white_logo.png" alt="cocone">
+            <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone">
         </div>
         <nav class="pc-nav">
-            <a href="/register">出席登録</a>
-            <a href="/rollCall">出欠席絞り込み</a>
-            <a href="#">ユーザー登録</a>
-            <a href="#">ログアウト</a>
+            {% if is_teacher %}
+                <a href="/register">出席登録</a>
+                <a href="/attendanceFilter">出欠席絞り込み</a>
+                <a href="/userManagement">ユーザー管理</a>
+            {% endif %}
+            <a href="/logout">ログアウト</a>
         </nav>
     </header>
 
@@ -27,13 +29,15 @@
         <div class="menu-background">
             <div class="menu-header">
                 <button id="close-btn" class="close-btn">×</button>
-                <img src="/static/image/cocone_white_logo.png" alt="cocone" class="menu-logo">
+                <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
             </div>
             <nav class="mobile-nav-links">
-                <a href="/register">出席登録</a>
-                <a href="/rollCall">出欠席絞り込み</a>
-                <a href="#">ユーザー登録</a>
-                <a href="#">ログアウト</a>
+                {% if is_teacher %}
+                    <a href="/register">出席登録</a>
+                    <a href="/attendanceFilter">出欠席絞り込み</a>
+                    <a href="/userManagement">ユーザー管理</a>
+                {% endif %}
+                <a href="/logout">ログアウト</a>
             </nav>
         </div>
     </div>
@@ -41,17 +45,17 @@
     <main>
         <h1>出席確認</h1>
         <div class="form-container">
-            <label for="class-select">対象クラスの選択</label>
+            <label for="course-select">対象科目の選択</label>
             <div class="select-wrapper">
-                <select id="class-select">
-                    <option value="" disabled selected></option>
-                    <option value="class-a">Aクラス</option>
-                    <option value="class-b">Bクラス</option>
-                    <option value="class-c">Cクラス</option>
+                <select id="course-select">
+                    <option value="" disabled selected>科目を選択してください</option>
+                    {% for course in courses %}
+                        <option value="{{ course.id }}">{{ course.name }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <p id="error-message" class="error-message"></p>
-
+            
             <!-- <div style="margin-top: 20px; width: 100%; max-width: 250px; text-align: left;">
                 <label for="signal-volume" style="font-size: 14px; font-weight: bold;">
                     信号音量: <span id="vol-display">0.1</span>
@@ -65,12 +69,13 @@
                     🎵 BGM: ON
                 </button>
             </div> -->
-            </div>
+        </div>
+
         <button id="submit-btn" class="circle-button">出席確認</button>
         <div id="status-area" style="margin-top:20px; color:#666;"></div>
     </main>
 
-    <script src="/static/js/common.js"></script>
-    <script src="/static/js/teacher.js"></script>
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/teacher.js') }}"></script>
 </body>
 </html>

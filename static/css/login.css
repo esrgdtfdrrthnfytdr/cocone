@@ -1,0 +1,138 @@
+@charset "UTF-8";
+
+/* --- ログイン画面レイアウト --- */
+.login-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 80px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.login-logo-area {
+    flex: 0 0 auto;
+}
+
+.login-logo {
+    width: 300px;
+    height: auto;
+    display: block;
+}
+
+.login-form-area {
+    /* フォームエリアの幅を入力ボックス等の基準にする */
+    flex: 0 0 320px;
+    display: flex;
+    flex-direction: column;
+    width: 100%; /* スマホ時に縮小されるよう設定 */
+    max-width: 320px; /* PCでの最大幅 */
+}
+
+.form-group {
+    margin-bottom: 25px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+label {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--color-text);
+}
+
+input[type="email"],
+input[type="password"] {
+    width: 100%;
+    padding: 12px 20px;
+    border: 2px solid var(--color-text);
+    border-radius: 25px;
+    font-size: 16px;
+    box-sizing: border-box; /* 枠線を含めて幅計算 */
+    font-family: 'Roboto', 'Noto Sans JP', sans-serif;
+    outline: none;
+    background-color: white;
+}
+
+input:focus {
+    border-color: var(--color-main);
+}
+
+/* エラー時の強調表示 */
+.input-error {
+    border-color: var(--color-warning-red) !important;
+    background-color: #fff0f0 !important;
+}
+
+/* エラーメッセージエリア */
+.error-message-area {
+    width: 100%;
+    min-height: 24px;
+    color: var(--color-warning-red);
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    margin-top: -10px;
+    margin-bottom: 5px;
+}
+
+/* --- ログインボタン --- */
+.login-btn {
+    /* 修正: 幅を入力欄と同じ100%にする */
+    width: 100%;
+    height: 55px;
+    margin-top: 20px;
+    
+    background-color: var(--color-main);
+    color: white;
+    font-size: 20px;
+    font-weight: 700;
+    border: 3px solid var(--color-text);
+    border-radius: 30px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    
+    /* 修正: 枠線を含めて100%に収める */
+    box-sizing: border-box;
+    
+    box-shadow: 4px 4px 0px var(--color-text);
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.2s;
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* margin-left/right auto は width:100% なので不要ですが残しても害はありません */
+    margin-left: auto; 
+    margin-right: auto;
+}
+
+.login-btn:hover {
+    filter: brightness(1.05);
+}
+
+.login-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px var(--color-text);
+}
+
+/* レスポンシブ */
+@media (max-width: 768px) {
+    .login-container {
+        flex-direction: column;
+        gap: 50px;
+    }
+
+    .login-logo {
+        width: 200px;
+    }
+    
+    /* スマホでも幅100% (max-width:320px) を維持 */
+    .login-form-area {
+        width: 100%;
+        max-width: 320px;
+    }
+}

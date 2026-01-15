@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ユーザー管理 | cocone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="../static/css/common.css">
+    <link rel="stylesheet" href="../static/css/userManagement.css">
+</head>
+<body>
+    <header>
+        <button id="hamburger-btn" class="hamburger-btn">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="logo-container">
+            <img src="../static/image/cocone_white_logo.png" alt="cocone">
+        </div>
+        <nav class="pc-nav">
+            <a href="register.html">出席登録</a>
+            <a href="rollCall.html">出欠席絞り込み</a>
+            <a href="userManagement.html">ユーザー管理</a>
+            <a href="#">ログアウト</a>
+        </nav>
+    </header>
+
+    <div id="mobile-menu" class="mobile-menu">
+        <div class="menu-background">
+            <div class="menu-header">
+                <button id="close-btn" class="close-btn">×</button>
+                <img src="../static/image/cocone_white_logo.png" alt="cocone" class="menu-logo">
+            </div>
+            <nav class="mobile-nav-links">
+                <a href="register.html">出席登録</a>
+                <a href="rollCall.html">出欠席絞り込み</a>
+                <a href="userManagement.html">ユーザー管理</a>
+                <a href="#">ログアウト</a>
+            </nav>
+        </div>
+    </div>
+
+    <main>
+        <h1>ユーザー管理</h1>
+
+        <div class="management-container">
+            
+            <div id="management-error-msg" class="page-error-area"></div>
+
+            <div class="control-panel">
+                <div class="filters">
+                    <div class="filter-item">
+                        <label for="class-filter">クラス：</label>
+                        <div class="select-wrapper mini-select">
+                            <select id="class-filter">
+                                <option value=""></option>
+                                <option value="R1A2">R1A2</option>
+                                <option value="R1A3">R1A3</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-item">
+                        <label for="year-filter">入学年：</label>
+                        <div class="select-wrapper mini-select">
+                            <select id="year-filter">
+                                <option value=""></option>
+                                <option value="2025">2025</option>
+                                <option value="2024">2024</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button id="delete-btn" class="action-btn btn-red">削除</button>
+                    <button id="add-btn" class="action-btn btn-green">追加</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="user-table">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-col"><input type="checkbox" id="select-all"></th>
+                            <th>学籍番号</th>
+                            <th>メールアドレス</th>
+                            <th>氏名</th>
+                            <th>クラス</th>
+                            <th>出席番号</th>
+                            <th>入学年</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
+                            <td>20224055</td>
+                            <td>20224055-enkeihodo@hcs.ac.jp</td>
+                            <td>円形歩道</td>
+                            <td>R1A2</td>
+                            <td>13</td>
+                            <td>2025</td>
+                        </tr>
+                        <tr>
+                            <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
+                            <td>20224055</td>
+                            <td>20224055-kikusuikogyo@hcs.ac.jp</td>
+                            <td>菊水工業</td>
+                            <td>R1A2</td>
+                            <td>14</td>
+                            <td>2025</td>
+                        </tr>
+                        <tr>
+                            <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
+                            <td>20224055</td>
+                            <td>20224055-johotaro@hcs.ac.jp</td>
+                            <td>情報太郎</td>
+                            <td>R1A2</td>
+                            <td>15</td>
+                            <td>2025</td>
+                        </tr>
+                        <tr>
+                            <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
+                            <td>20224055</td>
+                            <td>20224055-horenso@hcs.ac.jp</td>
+                            <td>報連相</td>
+                            <td>R1A2</td>
+                            <td>16</td>
+                            <td>2025</td>
+                        </tr>
+                        <tr>
+                            <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
+                            <td>20224055</td>
+                            <td>20224055-tesutodeta@hcs.ac.jp</td>
+                            <td>手巣斗出太</td>
+                            <td>R1A2</td>
+                            <td>17</td>
+                            <td>2025</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="add-user-modal" class="modal-overlay">
+        <div class="modal-content add-modal-content">
+            <h2>ユーザー追加</h2>
+            
+            <button class="bulk-add-btn">一括追加</button>
+
+            <div class="modal-body">
+                <div class="input-section">
+                    <h3>所属情報</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>入学年 :</label>
+                            <div class="select-wrapper modal-select">
+                                <select id="new-year">
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>クラス :</label>
+                            <div class="select-wrapper modal-select">
+                                <select id="new-class">
+                                    <option value="R1A2">R1A2</option>
+                                    <option value="R1A3">R1A3</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>出席番号 :</label>
+                            <div class="select-wrapper modal-select">
+                                <select id="new-number">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-section">
+                    <h3>本人情報</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label>学籍番号 :</label>
+                            <input type="text" id="new-student-id" class="modal-input short-input">
+                        </div>
+                        <div class="input-group">
+                            <label>氏名 :</label>
+                            <input type="text" id="new-name" class="modal-input short-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-section">
+                    <h3>アカウント情報</h3>
+                    <div class="input-row single-row">
+                        <label>メールアドレス :</label>
+                        <input type="email" id="new-email" class="modal-input long-input">
+                    </div>
+                    <div class="input-row single-row">
+                        <label>初期パスワード :</label>
+                        <input type="text" id="new-password" class="modal-input medium-input">
+                        <button id="auto-pass-btn" class="auto-pass-btn">自動パスワード生成</button>
+                    </div>
+                </div>
+
+                <div id="modal-error-msg" class="modal-error-area"></div>
+            </div>
+
+            <div class="modal-btn-area">
+                <button id="modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
+                <button id="modal-add-btn" class="modal-btn save-btn">追加</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../static/js/common.js"></script>
+    <script src="../static/js/userManagement.js"></script>
+</body>
+</html>

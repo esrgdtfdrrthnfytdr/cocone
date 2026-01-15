@@ -2,92 +2,244 @@ import os
 import sys
 import random
 import datetime
-from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from typing import Optional
+
+from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import create_engine, text
+from starlette.middleware.sessions import SessionMiddleware
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# Windowsでの文字化け対策
+# Windows等のコンソールでの文字化け対策
 sys.stdout.reconfigure(encoding='utf-8')
 
 # .envファイルを読み込む
 load_dotenv()
 
-app = Flask(__name__)
+# アプリケーションの初期化
+app = FastAPI()
 
-# データベース設定 (Windows用にUTF-8オプションを追加)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "connect_args": {"options": "-c client_encoding=utf8"}
-}
+# セッション管理の有効化 (secret_keyは推測困難な文字列にしてください)
+app.add_middleware(SessionMiddleware, secret_key="super-secret-key-cocone-demo")
 
-db = SQLAlchemy(app)
+# 静的ファイル (CSS/JS/画像) のマウント
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# トップページ
-@app.route('/')
-def index():
-    return "Cocone Attendance V3 (DB Connected)"
+# テンプレートエンジンの設定
+templates = Jinja2Templates(directory="templates")
 
-# 先生用ページ
-@app.route('/teacher')
-def teacher_page():
-    return render_template('teacher.html')
+# データベース接続設定
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("⚠ Warning: DATABASE_URL is not set in .env")
 
-# 学生用ページ
-@app.route('/student')
-def student_page():
-    return render_template('student.html')
+# 文字化け対策オプション付きでDBエンジンを作成
+engine = create_engine(
+    DATABASE_URL, 
+    connect_args={"options": "-c client_encoding=utf8"}
+)
 
-# API: OTP生成 (先生が実行) -> DBに授業を作成
-@app.route('/api/generate_otp', methods=['POST'])
-def generate_otp():
+# --- Pydanticモデル (APIのリクエストボディ用) ---
+class GenerateOTPRequest(BaseModel):
+    course_id: int
+
+class CheckAttendRequest(BaseModel):
+    otp_value: int
+
+
+# ==========================================
+#  ルーティング: 画面遷移 (GET)
+# ==========================================
+
+# 1. ログイン画面
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    # エラーパラメータがあれば取得してテンプレートに渡す
+    error_code = request.query_params.get("error")
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "error": error_code
+    })
+
+# ログイン処理 (POST)
+@app.post("/login")
+async def login(request: Request, email: str = Form(...), password: str = Form(...)):
+    try:
+        with engine.connect() as conn:
+            # 1. Teachersテーブルを検索
+            # init.sqlに基づき、password_hashを比較 (※本番ではハッシュ化ライブラリを使用推奨)
+            query_teacher = text("SELECT teacher_id, name, password_hash FROM teachers WHERE email = :email")
+            result_teacher = conn.execute(query_teacher, {"email": email}).fetchone()
+
+            if result_teacher:
+                if result_teacher.password_hash == password:
+                    # セッションに情報を保存
+                    request.session["role"] = "teacher"
+                    request.session["user_id"] = result_teacher.teacher_id
+                    request.session["user_name"] = result_teacher.name
+                    return RedirectResponse(url="/rollCall", status_code=303)
+            
+            # 2. Studentsテーブルを検索
+            query_student = text("SELECT student_number, name, password_hash, homeroom_class FROM students WHERE email = :email")
+            result_student = conn.execute(query_student, {"email": email}).fetchone()
+
+            if result_student:
+                if result_student.password_hash == password:
+                    # セッションに情報を保存
+                    request.session["role"] = "student"
+                    request.session["user_id"] = result_student.student_number
+                    request.session["user_name"] = result_student.name
+                    request.session["class"] = result_student.homeroom_class
+                    return RedirectResponse(url="/register", status_code=303)
+
+            # 認証失敗
+            return RedirectResponse(url="/?error=auth_failed", status_code=303)
+
+    except Exception as e:
+        print(f"Login Error: {e}")
+        return RedirectResponse(url="/?error=server_error", status_code=303)
+
+# ログアウト処理
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/", status_code=303)
+
+
+# --- 共通ヘルパー: ページ描画と権限チェック ---
+def render_page(request: Request, template_name: str, extra_context: dict = None):
+    role = request.session.get("role")
+    if not role:
+        return RedirectResponse(url="/", status_code=303)
+    
+    context = {
+        "request": request,
+        "is_teacher": (role == "teacher"),
+        "user_name": request.session.get("user_name"),
+    }
+    if extra_context:
+        context.update(extra_context)
+        
+    return templates.TemplateResponse(template_name, context)
+
+
+# 2. 先生用: 出席確認画面 (rollCall.html)
+@app.get("/rollCall", response_class=HTMLResponse)
+async def roll_call(request: Request):
+    role = request.session.get("role")
+    user_id = request.session.get("user_id")
+
+    # 先生以外はトップへリダイレクト
+    if role != "teacher":
+        return RedirectResponse(url="/", status_code=303)
+
+    # 担当科目をDBから取得
+    courses_list = []
+    try:
+        with engine.connect() as conn:
+            sql = text("SELECT course_id, course_name FROM courses WHERE teacher_id = :tid")
+            rows = conn.execute(sql, {"tid": user_id}).fetchall()
+            courses_list = [{"id": r.course_id, "name": r.course_name} for r in rows]
+    except Exception as e:
+        print(f"DB Error (Fetching Courses): {e}")
+
+    # 科目リストを渡して描画
+    return render_page(request, "rollCall.html", {"courses": courses_list})
+
+
+# 3. 生徒用: 出席登録画面 (register.html)
+@app.get("/register", response_class=HTMLResponse)
+async def register(request: Request):
+    return render_page(request, "register.html")
+
+
+# 4. 出欠席絞り込み画面 (attendanceFilter.html)
+@app.get("/attendanceFilter", response_class=HTMLResponse)
+async def attendance_filter(request: Request):
+    return render_page(request, "attendanceFilter.html")
+
+
+# 5. 出欠席結果画面 (attendanceResult.html)
+@app.get("/attendanceResult", response_class=HTMLResponse)
+async def attendance_result(request: Request):
+    return render_page(request, "attendanceResult.html")
+
+
+# 6. 出欠席状況画面 (attendanceStatus.html)
+@app.get("/attendanceStatus", response_class=HTMLResponse)
+async def attendance_status(request: Request):
+    return render_page(request, "attendanceStatus.html")
+
+
+# 7. ユーザー管理画面 (userManagement.html)
+@app.get("/userManagement", response_class=HTMLResponse)
+async def user_management(request: Request):
+    return render_page(request, "userManagement.html")
+
+
+# 8. パスワード変更画面 (passwordChange.html)
+@app.get("/passwordChange", response_class=HTMLResponse)
+async def password_change(request: Request):
+    # ログインしていなくても表示できる場合の例（要件による）
+    return templates.TemplateResponse("passwordChange.html", {"request": request})
+
+
+# ==========================================
+#  API (非同期通信用)
+# ==========================================
+
+# API 1: OTP生成と授業セッション開始 (先生が実行)
+@app.post("/api/generate_otp")
+async def generate_otp(req: GenerateOTPRequest):
     # 1. ランダムな4ビット(0-15)の値を生成
     val = random.randint(0, 15)
     binary_str = format(val, '04b')
-    
+    current_date = datetime.date.today().strftime('%Y-%m-%d')
+
     # 2. データベースに「授業セッション」を保存
-    # 本来は科目名などを画面で選びますが、今回は「IoT演習」で固定します
+    # 受け取った course_id を使用する
     sql = text("""
-        INSERT INTO class_sessions (subject_name, room_id, date, sound_token)
-        VALUES (:subj, :room, :date, :token)
+        INSERT INTO class_sessions (course_id, date, sound_token)
+        VALUES (:cid, :date, :token)
         RETURNING session_id
     """)
     
-    current_date = datetime.date.today().strftime('%Y-%m-%d')
-    
     try:
-        result = db.session.execute(sql, {
-            "subj": "IoT演習",
-            "room": "Room101",
-            "date": current_date,
-            "token": str(val) # 正解の数値を文字として保存
-        })
-        db.session.commit()
+        with engine.connect() as conn:
+            result = conn.execute(sql, {
+                "cid": req.course_id,
+                "date": current_date,
+                "token": str(val)
+            })
+            conn.commit()
+            new_id = result.fetchone()[0]
+            print(f"✅ Session Started: ID={new_id}, CourseID={req.course_id}, Token={val}")
         
-        # 保存したセッションIDを取得 (ログ出力用)
-        new_id = result.fetchone()[0]
-        print(f"✅ DB保存完了: Session ID={new_id}, 正解={val} ({binary_str})")
-        
-        return jsonify({"otp_binary": binary_str, "otp_display": val})
+        return JSONResponse({"otp_binary": binary_str, "otp_display": val})
         
     except Exception as e:
-        print(f"❌ DBエラー: {e}")
-        return jsonify({"error": "Database error"}), 500
+        print(f"❌ DB Error (generate_otp): {e}")
+        return JSONResponse({"error": "Database error"}, status_code=500)
 
-# API: 出席確認 (学生が実行) -> DBと照合して保存
-@app.route('/api/check_attend', methods=['POST'])
-def check_attend():
-    data = request.json
-    student_otp = data.get('otp_value') # 生徒が解読した値 (数値)
-    
-    # テスト用：今のアプリには学生ID入力欄がないので、さっき作った「test」さんとして扱います
-    student_id = 's99999999' 
-    
-    print(f"📝 受信: 生徒OTP={student_otp} (Student: {student_id})")
 
-    # 1. 最新の授業セッションを探す
-    # (一番IDが大きい＝最新 とみなします)
+# API 2: 出席確認 (生徒が実行)
+@app.post("/api/check_attend")
+async def check_attend(req: CheckAttendRequest, request: Request):
+    student_otp = req.otp_value
+    student_id = request.session.get("user_id") # セッションから学籍番号を取得
+
+    if not student_id:
+         # ログインしていない場合はエラー（またはゲスト扱い）
+         # 今回はデモとしてエラーにはせず、ログに出すだけに留める
+         print("⚠ Warning: No student ID found in session.")
+         student_id = "guest_unknown"
+
+    print(f"📝 Received OTP: {student_otp} from {student_id}")
+
+    # 1. 最新の授業セッションを探す (簡易ロジック)
     sql_get_session = text("""
         SELECT session_id, sound_token 
         FROM class_sessions 
@@ -95,38 +247,35 @@ def check_attend():
         LIMIT 1
     """)
     
-    session_row = db.session.execute(sql_get_session).fetchone()
-    
-    if not session_row:
-        return jsonify({"status": "error", "message": "授業が開催されていません"})
-    
-    current_session_id = session_row[0]
-    correct_otp = int(session_row[1]) # DBから正解を取得
-    
-    # 2. 正解判定
-    if student_otp == correct_otp:
-        # 正解なら「出席結果」テーブルに書き込む
-        sql_insert_result = text("""
-            INSERT INTO attendance_results (session_id, student_number, status, note)
-            VALUES (:sess_id, :stu_num, '出席', 'アプリから登録')
-        """)
-        
-        try:
-            db.session.execute(sql_insert_result, {
-                "sess_id": current_session_id,
-                "stu_num": student_id
-            })
-            db.session.commit()
-            print("🎉 出席データをDBに書き込みました！")
-            return jsonify({"status": "success", "message": "出席完了！DBに登録しました"})
+    try:
+        with engine.connect() as conn:
+            session_row = conn.execute(sql_get_session).fetchone()
             
-        except Exception as e:
-            print(f"❌ 書き込みエラー: {e}")
-            return jsonify({"status": "error", "message": "すでに登録済みか、エラーが発生しました"})
+            if not session_row:
+                return JSONResponse({"status": "error", "message": "授業が開催されていません"})
             
-    else:
-        return jsonify({"status": "error", "message": f"コードが違います (正解は {correct_otp})"})
+            current_session_id = session_row.session_id
+            correct_otp = int(session_row.sound_token)
+            
+            # 2. 正解判定
+            if student_otp == correct_otp:
+                # 重複チェック等は省略し、出席結果をINSERT
+                sql_insert_result = text("""
+                    INSERT INTO attendance_results (session_id, student_number, status, note)
+                    VALUES (:sess_id, :stu_num, '出席', 'アプリから')
+                """)
+                
+                conn.execute(sql_insert_result, {
+                    "sess_id": current_session_id,
+                    "stu_num": student_id
+                })
+                conn.commit()
+                print(f"🎉 Attendance Recorded: {student_id}")
+                return JSONResponse({"status": "success", "message": "出席登録完了"})
+            
+            else:
+                return JSONResponse({"status": "error", "message": f"コード不一致 (正解は{correct_otp})"})
 
-if __name__ == '__main__':
-    # 外部(スマホ)から接続できるように '0.0.0.0' で起動
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    except Exception as e:
+        print(f"❌ DB Error (check_attend): {e}")
+        return JSONResponse({"status": "error", "message": "サーバーエラーが発生しました"})

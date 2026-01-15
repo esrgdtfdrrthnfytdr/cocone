@@ -1,0 +1,137 @@
+@charset "UTF-8";
+
+/* --- 統計エリア --- */
+.stats-area {
+    display: flex;
+    justify-content: center;
+    gap: 80px;
+    margin-bottom: 50px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    color: var(--color-text);
+}
+
+.stat-value {
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    font-family: 'Roboto', sans-serif;
+}
+
+.stat-value .unit {
+    font-size: 24px;
+    margin-left: 5px;
+    color: var(--color-text);
+}
+
+.value-green {
+    color: var(--color-main);
+}
+
+.value-red {
+    color: var(--color-warning-red);
+}
+
+/* --- リストセクション --- */
+.list-section {
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.list-section h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--color-text);
+}
+
+.table-container {
+    width: 100%;
+    background-color: white;
+    border: 2px solid var(--color-text);
+    border-radius: 15px;
+    padding: 20px 30px;
+    box-sizing: border-box;
+}
+
+.status-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.status-table th {
+    font-size: 14px;
+    font-weight: 700;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ccc;
+    color: var(--color-text);
+    text-align: center;
+}
+
+.status-table td {
+    font-size: 16px;
+    padding: 15px 0;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    color: var(--color-text);
+}
+
+.status-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* --- ステータスラベル (変更箇所) --- */
+.status-label {
+    display: inline-block;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 20px;
+    border-radius: 20px; /* ピル型 */
+    font-family: 'Noto Sans JP', sans-serif;
+    /* クリックできないためカーソル指定やホバー効果は削除 */
+}
+
+/* 遅刻ラベル (赤) */
+.label-late {
+    background-color: var(--color-warning-red);
+}
+
+/* 早退ラベル (濃い緑) */
+.label-early {
+    background-color: var(--color-accent);
+}
+
+/* --- レスポンシブ対応 --- */
+@media (max-width: 768px) {
+    .stats-area {
+        gap: 40px;
+    }
+
+    .stat-value {
+        font-size: 48px;
+    }
+
+    .list-section {
+        width: 90%;
+    }
+
+    .table-container {
+        padding: 15px;
+    }
+
+    .status-table th, 
+    .status-table td {
+        font-size: 14px;
+        padding: 10px 0;
+    }
+}

@@ -1,5 +1,10 @@
 @charset "UTF-8";
 
+/* --- 追加箇所: スクロールバーによるガタつき防止 --- */
+html {
+    scrollbar-gutter: stable;
+}
+
 /* --- カラーパレット定義 --- */
 :root {
     --color-base: #F5F7F7;
@@ -24,25 +29,27 @@ body {
 
 /* --- ヘッダー (PC) --- */
 header {
-    /* 修正箇所: 固定マージンではなく、最大幅と中央寄せを指定 */
-    width: calc(100% - 60px); /* 左右に30pxずつの余白を確保 (100% - 60px) */
-    max-width: 1280px;        /* 最大幅を設定（これ以上横に伸びない） */
-    margin: 20px auto;        /* 上下20px、左右は自動で中央寄せ */
-    
-    background-color: var(--color-main);
+    width: calc(100% - 60px);
+    max-width: 1500px;
+    margin: 30px auto;
     height: 80px;
-    border-radius: 40px;
+    min-height: 80px;
+    max-height: 80px;
+    border-radius: 50px;
+    flex-shrink: 0;
+    overflow: hidden;
+    background-color: var(--color-main);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 40px;
+    padding: 0 50px;
     box-sizing: border-box;
     position: relative;
     z-index: 10;
 }
 
 .logo-container img {
-    height: 40px;
+    height: 45px;
     width: auto;
     display: block;
 }
@@ -85,7 +92,7 @@ header {
     opacity: 0.8;
 }
 
-/* --- スマホ用メニューオーバーレイ (円形アニメーション版) --- */
+/* --- スマホ用メニューオーバーレイ --- */
 .mobile-menu {
     position: fixed;
     top: 0;
@@ -172,16 +179,26 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-top: 40px;
     padding-bottom: 80px;
 }
 
+/* タイトル (修正箇所) */
 h1 {
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 40px;
     letter-spacing: 0.05em;
     color: var(--color-text);
+    
+    /* レスポンシブ対応用設定 */
+    width: 90%;
+    max-width: 1200px;
+    text-align: center;
+    line-height: 1.5; /* 行間を広げて読みやすく */
+    word-wrap: break-word; /* 長い単語も折り返す */
+    overflow-wrap: break-word;
 }
 
 .form-container {
@@ -227,11 +244,18 @@ h1 {
 /* レスポンシブ共通 */
 @media (max-width: 768px) {
     header {
-        /* スマホ時は幅いっぱいまで使うように微調整 */
-        width: calc(100% - 40px); /* 左右20pxずつの余白 */
+        width: calc(100% - 40px);
         margin: 20px auto;
+        height: 70px; 
+        min-height: 70px;
+        max-height: 70px;
+        border-radius: 40px;
         padding: 0 25px;
         justify-content: center;
+    }
+
+    .logo-container img {
+        height: 40px;
     }
 
     .hamburger-btn {
@@ -244,9 +268,11 @@ h1 {
         display: none;
     }
 
+    /* スマホ時のタイトル調整 */
     h1 {
-        font-size: 24px;
+        font-size: 22px; /* 少し小さくして収まりを良くする */
         margin-bottom: 30px;
+        width: 95%; /* ギリギリまで広げる */
     }
     
     .circle-button {

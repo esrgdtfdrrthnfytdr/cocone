@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン | cocone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/login.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-logo-area">
+            <img src="{{ url_for('static', path='/image/cocone_default_logo.webp') }}" alt="cocone" class="login-logo">
+        </div>
+
+        <div class="login-form-area">
+            {% if error == 'auth_failed' %}
+                <div class="error-message-area" style="display:block; margin-bottom:15px;">
+                    メールアドレスまたはパスワードが違います
+                </div>
+            {% elif error == 'server_error' %}
+                <div class="error-message-area" style="display:block; margin-bottom:15px;">
+                    サーバーエラーが発生しました
+                </div>
+            {% endif %}
+
+            <form action="/login" method="post">
+                <div class="form-group">
+                    <label for="email">メールアドレス</label>
+                    <input type="email" id="email" name="email" required placeholder="例: teacher@hcs.ac.jp">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" id="login-btn" class="login-btn">
+                    ログイン
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+    </body>
+</html>
