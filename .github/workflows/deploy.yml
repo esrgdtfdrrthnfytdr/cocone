@@ -1,0 +1,48 @@
+name: Deploy FastAPI App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. GitHubから最新コードを取得
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. SFTPでファイル転送
+      - name: SFTP Upload
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          username: ${{ secrets.SFTP_USERNAME }}
+          server: ${{ secrets.SFTP_HOST }}
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SFTP_PORT }} 
+          
+          local_path: './'
+          remote_path: '/root/cocone' # ← あなたの環境に合わせて修正しました
+          
+          # 重要: ローカルに無いファイルをサーバーから消す設定
+          delete_remote_files: true
+          
+          # 転送除外設定
+          # .git系, Pythonキャッシュ, 仮想環境(env), サーバー上の設定ファイル(.env) は消さない・送らない
+          args: '--exclude=.git* --exclude=__pycache__ --exclude=env --exclude=.env'
+
+      # 3. SSHで接続してライブラリ更新と再起動
+      - name: Install Requirements & Restart Service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SFTP_PORT }}
+          script: |
+            cd /root/cocone
+            
+            pip install -r requirements.txt
+
+            systemctl restart cocone
