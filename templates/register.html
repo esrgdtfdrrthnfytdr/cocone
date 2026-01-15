@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>出席登録 | cocone</title>
+    <title>cocone - 出席登録</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="../static/css/common.css">
-    <link rel="stylesheet" href="../static/css/register.css">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/student.css') }}">
 </head>
 <body>
     <header>
@@ -17,13 +17,13 @@
             <span></span><span></span><span></span>
         </button>
         <div class="logo-container">
-            <img src="../static/image/cocone_white_logo.png" alt="cocone">
+            <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone">
         </div>
         <nav class="pc-nav">
-            <a href="register.html">出席登録</a>
-            <a href="rollCall.html">出欠席絞り込み</a>
-            <a href="userManagement.html">ユーザー管理</a>
-            <a href="#">ログアウト</a>
+            <a href="/register">出席登録</a>
+            <a href="/attendanceFilter">出欠席絞り込み</a>
+            <a href="#">ユーザー登録</a>
+            <a href="/logout">ログアウト</a>
         </nav>
     </header>
 
@@ -31,48 +31,48 @@
         <div class="menu-background">
             <div class="menu-header">
                 <button id="close-btn" class="close-btn">×</button>
-                <img src="../static/image/cocone_white_logo.png" alt="cocone" class="menu-logo">
+                <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
             </div>
             <nav class="mobile-nav-links">
-                <a href="register.html">出席登録</a>
-                <a href="rollCall.html">出欠席絞り込み</a>
-                <a href="userManagement.html">ユーザー管理</a>
-                <a href="#">ログアウト</a>
+                <a href="/register">出席登録</a>
+                <a href="/attendanceFilter">出欠席絞り込み</a>
+                <a href="#">ユーザー登録</a>
+                <a href="/logout">ログアウト</a>
             </nav>
         </div>
     </div>
 
     <main>
         <h1>出席登録</h1>
-
-        <div class="register-container">
-            <div id="register-error-msg" class="page-error-area"></div>
-
-            <div class="form-area">
-                <div class="form-group">
-                    <label for="class-select">クラス</label>
-                    <div class="select-wrapper">
-                        <select id="class-select">
-                            <option value="">選択してください</option>
-                            <option value="R1A2">R1A2</option>
-                            <option value="R1A3">R1A3</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button id="start-btn" class="register-btn">
-                    出席を開始する
-                </button>
-            </div>
-            
-            <div id="active-status" class="active-status" style="display: none;">
-                <p class="status-text">出席登録を受付中...</p>
-                <button id="stop-btn" class="stop-btn">終了する</button>
-            </div>
-        </div>
+        <button id="register-btn" class="circle-button">出席登録</button>
     </main>
 
-    <script src="../static/js/common.js"></script>
-    <script src="../static/js/register.js"></script>
+    <div id="completion-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>出席登録が完了しました！</h2>
+            <div class="attendance-details">
+                <div class="detail-row">
+                    <span class="detail-label">出席番号</span>
+                    <span class="detail-value">13</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">氏名</span>
+                    <span class="detail-value">情報太郎</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">登録日</span>
+                    <span class="detail-value">11月25日</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">登録コマ</span>
+                    <span class="detail-value">1コマ目</span>
+                </div>
+            </div>
+            <button id="modal-close-btn" class="modal-close-btn">閉じる</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/student.js') }}"></script>
 </body>
 </html>
