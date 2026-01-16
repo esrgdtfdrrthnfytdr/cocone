@@ -22,7 +22,7 @@ load_dotenv()
 # アプリケーションの初期化
 app = FastAPI()
 
-# セッション管理の有効化 (secret_keyは推測困難な文字列にしてください)
+# セッション管理の有効化
 app.add_middleware(SessionMiddleware, secret_key="super-secret-key-cocone-demo")
 
 # 静的ファイル (CSS/JS/画像) のマウント
@@ -44,7 +44,7 @@ engine = create_engine(
 
 # --- Pydanticモデル (APIのリクエストボディ用) ---
 class GenerateOTPRequest(BaseModel):
-    class_id: int  # 修正: classe_id -> class_id (JS側と合わせる)
+    class_id: int  # 修正: classe_id -> class_id
 
 class CheckAttendRequest(BaseModel):
     otp_value: int
@@ -57,7 +57,6 @@ class CheckAttendRequest(BaseModel):
 # 1. ログイン画面
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    # エラーパラメータがあれば取得してテンプレートに渡す
     error_code = request.query_params.get("error")
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -70,13 +69,11 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     try:
         with engine.connect() as conn:
             # 1. Teachersテーブルを検索
-            # init.sqlに基づき、password_hashを比較 (※本番ではハッシュ化ライブラリを使用推奨)
             query_teacher = text("SELECT teacher_id, name, password_hash FROM teachers WHERE email = :email")
             result_teacher = conn.execute(query_teacher, {"email": email}).fetchone()
 
             if result_teacher:
                 if result_teacher.password_hash == password:
-                    # セッションに情報を保存
                     request.session["role"] = "teacher"
                     request.session["user_id"] = result_teacher.teacher_id
                     request.session["user_name"] = result_teacher.name
@@ -88,14 +85,12 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
 
             if result_student:
                 if result_student.password_hash == password:
-                    # セッションに情報を保存
                     request.session["role"] = "student"
                     request.session["user_id"] = result_student.student_number
                     request.session["user_name"] = result_student.name
                     request.session["class"] = result_student.homeroom_class
                     return RedirectResponse(url="/register", status_code=303)
 
-            # 認証失敗
             return RedirectResponse(url="/?error=auth_failed", status_code=303)
 
     except Exception as e:
@@ -112,14 +107,13 @@ async def logout(request: Request):
 # --- 共通ヘルパー: ページ描画と権限チェック ---
 def render_page(request: Request, template_name: str, extra_context: dict = None):
     role = request.session.get("role")
-    # ログインしていない場合はトップへ
     if not role:
         return RedirectResponse(url="/", status_code=303)
     
-    # 共通コンテキストの作成
+    # ここで is_teacher フラグを設定し、layout.html に渡す
     context = {
         "request": request,
-        "is_teacher": (role == "teacher"),  # ここでヘッダー切り替え用のフラグを設定
+        "is_teacher": (role == "teacher"),
         "user_name": request.session.get("user_name"),
     }
     if extra_context:
@@ -138,19 +132,21 @@ async def roll_call(request: Request):
     if role != "teacher":
         return RedirectResponse(url="/", status_code=303)
 
-    # 担当科目をDBから取得
     classes_list = []
     try:
         with engine.connect() as conn:
             sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
             rows = conn.execute(sql, {"tid": user_id}).fetchall()
-            # 修正: テンプレート側({{ course.id }}, {{ course.name }})に合わせてキー名を変更
+            
+            # 【重要修正】
+            # HTML側が {{ class.id }}, {{ class.name }} を期待していると仮定し、キー名を id, name に設定。
+            # HTML側が {{ class.class_id }} の場合は "id" を "class_id" に書き換えてください。
             classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
     except Exception as e:
         print(f"DB Error (Fetching classes): {e}")
 
-    # 修正: render_pageを使用し、変数名を 'courses' にして渡す
-    return render_page(request, "rollCall.html", {"courses": classes_list})
+    # render_page を使い、キー名を "classes" にして渡す（HTMLのループ変数名に合わせる）
+    return render_page(request, "rollCall.html", {"classes": classes_list})
 
 
 # 3. 生徒用: 出席登録画面 (register.html)
@@ -186,10 +182,6 @@ async def user_management(request: Request):
 # 8. パスワード変更画面 (passwordChange.html)
 @app.get("/passwordChange", response_class=HTMLResponse)
 async def password_change(request: Request):
-    # render_pageを使ってヘッダーを正しく表示させる（ログイン中の場合）
-    # ログインしていなくても表示したい場合はTemplateResponseのままでも良いが、
-    # 統一感のためにログインチェックを通すか、is_teacherを手動で渡す必要がある。
-    # ここでは簡易的にログイン済み前提として render_page を推奨。
     return render_page(request, "passwordChange.html")
 
 
@@ -200,13 +192,10 @@ async def password_change(request: Request):
 # API 1: OTP生成と授業セッション開始 (先生が実行)
 @app.post("/api/generate_otp")
 async def generate_otp(req: GenerateOTPRequest):
-    # 1. ランダムな4ビット(0-15)の値を生成
     val = random.randint(0, 15)
     binary_str = format(val, '04b')
     current_date = datetime.date.today().strftime('%Y-%m-%d')
 
-    # 2. データベースに「授業セッション」を保存
-    # 受け取った class_id を使用する
     sql = text("""
         INSERT INTO class_sessions (class_id, date, sound_token)
         VALUES (:cid, :date, :token)
@@ -215,7 +204,7 @@ async def generate_otp(req: GenerateOTPRequest):
     
     try:
         with engine.connect() as conn:
-            # 修正: req.classe_id -> req.class_id
+            # req.class_id を使用
             result = conn.execute(sql, {
                 "cid": req.class_id,
                 "date": current_date,
@@ -236,17 +225,14 @@ async def generate_otp(req: GenerateOTPRequest):
 @app.post("/api/check_attend")
 async def check_attend(req: CheckAttendRequest, request: Request):
     student_otp = req.otp_value
-    student_id = request.session.get("user_id") # セッションから学籍番号を取得
+    student_id = request.session.get("user_id")
 
     if not student_id:
-         # ログインしていない場合はエラー（またはゲスト扱い）
-         # 今回はデモとしてエラーにはせず、ログに出すだけに留める
          print("⚠ Warning: No student ID found in session.")
          student_id = "guest_unknown"
 
     print(f"📝 Received OTP: {student_otp} from {student_id}")
 
-    # 1. 最新の授業セッションを探す (簡易ロジック)
     sql_get_session = text("""
         SELECT session_id, sound_token 
         FROM class_sessions 
@@ -264,9 +250,7 @@ async def check_attend(req: CheckAttendRequest, request: Request):
             current_session_id = session_row.session_id
             correct_otp = int(session_row.sound_token)
             
-            # 2. 正解判定
             if student_otp == correct_otp:
-                # 重複チェック等は省略し、出席結果をINSERT
                 sql_insert_result = text("""
                     INSERT INTO attendance_results (session_id, student_number, status, note)
                     VALUES (:sess_id, :stu_num, '出席', 'アプリから')
