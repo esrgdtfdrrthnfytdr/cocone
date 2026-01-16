@@ -1,277 +1,166 @@
-import os
-import sys
-import random
-import datetime
-from typing import Optional
+# 冒頭のインポートに追加
+from collections import defaultdict
+from typing import Optional # 既に記述済みなら不要
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, text
-from starlette.middleware.sessions import SessionMiddleware
-from pydantic import BaseModel
-from dotenv import load_dotenv
-
-# Windows等のコンソールでの文字化け対策
-sys.stdout.reconfigure(encoding='utf-8')
-
-# .envファイルを読み込む
-load_dotenv()
-
-# アプリケーションの初期化
-app = FastAPI()
-
-# セッション管理の有効化
-app.add_middleware(SessionMiddleware, secret_key="super-secret-key-cocone-demo")
-
-# 静的ファイル (CSS/JS/画像) のマウント
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# テンプレートエンジンの設定
-templates = Jinja2Templates(directory="templates")
-
-# データベース接続設定
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    print("⚠ Warning: DATABASE_URL is not set in .env")
-
-# 文字化け対策オプション付きでDBエンジンを作成
-engine = create_engine(
-    DATABASE_URL, 
-    connect_args={"options": "-c client_encoding=utf8"}
-)
-
-# --- Pydanticモデル (APIのリクエストボディ用) ---
-class GenerateOTPRequest(BaseModel):
-    class_id: int  # 修正: classe_id -> class_id
-
-class CheckAttendRequest(BaseModel):
-    otp_value: int
-
-
-# ==========================================
-#  ルーティング: 画面遷移 (GET)
-# ==========================================
-
-# 1. ログイン画面
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    error_code = request.query_params.get("error")
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "error": error_code
-    })
-
-# ログイン処理 (POST)
-@app.post("/login")
-async def login(request: Request, email: str = Form(...), password: str = Form(...)):
-    try:
-        with engine.connect() as conn:
-            # 1. Teachersテーブルを検索
-            query_teacher = text("SELECT teacher_id, name, password_hash FROM teachers WHERE email = :email")
-            result_teacher = conn.execute(query_teacher, {"email": email}).fetchone()
-
-            if result_teacher:
-                if result_teacher.password_hash == password:
-                    request.session["role"] = "teacher"
-                    request.session["user_id"] = result_teacher.teacher_id
-                    request.session["user_name"] = result_teacher.name
-                    return RedirectResponse(url="/rollCall", status_code=303)
-            
-            # 2. Studentsテーブルを検索
-            query_student = text("SELECT student_number, name, password_hash, homeroom_class FROM students WHERE email = :email")
-            result_student = conn.execute(query_student, {"email": email}).fetchone()
-
-            if result_student:
-                if result_student.password_hash == password:
-                    request.session["role"] = "student"
-                    request.session["user_id"] = result_student.student_number
-                    request.session["user_name"] = result_student.name
-                    request.session["class"] = result_student.homeroom_class
-                    return RedirectResponse(url="/register", status_code=303)
-
-            return RedirectResponse(url="/?error=auth_failed", status_code=303)
-
-    except Exception as e:
-        print(f"Login Error: {e}")
-        return RedirectResponse(url="/?error=server_error", status_code=303)
-
-# ログアウト処理
-@app.get("/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse(url="/", status_code=303)
-
-
-# --- 共通ヘルパー: ページ描画と権限チェック ---
-def render_page(request: Request, template_name: str, extra_context: dict = None):
-    role = request.session.get("role")
-    if not role:
-        return RedirectResponse(url="/", status_code=303)
-    
-    # ここで is_teacher フラグを設定し、layout.html に渡す
-    context = {
-        "request": request,
-        "is_teacher": (role == "teacher"),
-        "user_name": request.session.get("user_name"),
-    }
-    if extra_context:
-        context.update(extra_context)
-        
-    return templates.TemplateResponse(template_name, context)
-
-
-# 2. 先生用: 出席確認画面 (rollCall.html)
-@app.get("/rollCall", response_class=HTMLResponse)
-async def roll_call(request: Request):
-    role = request.session.get("role")
-    user_id = request.session.get("user_id")
-
-    # 先生以外はトップへリダイレクト
-    if role != "teacher":
-        return RedirectResponse(url="/", status_code=303)
-
-
-# ==================================================================
-# クラス選択の名残(科目に変更　or 再利用の可能性があるためコメントアウト)
-# ===================================================================
-    # classes_list = []
-    # try:
-    #     with engine.connect() as conn:
-    #         sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
-    #         rows = conn.execute(sql, {"tid": user_id}).fetchall()
-            
-    #         # 【重要修正】
-    #         # HTML側が {{ class.id }}, {{ class.name }} を期待していると仮定し、キー名を id, name に設定。
-    #         # HTML側が {{ class.class_id }} の場合は "id" を "class_id" に書き換えてください。
-    #         classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
-    # except Exception as e:
-    #     print(f"DB Error (Fetching classes): {e}")
-
-    # # render_page を使い、キー名を "classes" にして渡す（HTMLのループ変数名に合わせる）
-    # return render_page(request, "rollCall.html", {"classes": classes_list})
-
-    return render_page(request, "rollCall.html")
-
-# 3. 生徒用: 出席登録画面 (register.html)
-@app.get("/register", response_class=HTMLResponse)
-async def register(request: Request):
-    return render_page(request, "register.html")
-
-
-# 4. 出欠席絞り込み画面 (attendanceFilter.html)
-@app.get("/attendanceFilter", response_class=HTMLResponse)
-async def attendance_filter(request: Request):
-    return render_page(request, "attendanceFilter.html")
-
+# ... (中略) ...
 
 # 5. 出欠席結果画面 (attendanceResult.html)
 @app.get("/attendanceResult", response_class=HTMLResponse)
-async def attendance_result(request: Request):
-    return render_page(request, "attendanceResult.html")
+async def attendance_result(
+    request: Request,
+    class_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    # パラメータが不足している場合はエラー表示などの対策
+    if not class_name or not start_date or not end_date:
+        return render_page(request, "attendanceResult.html", {
+            "error": "検索条件が不足しています",
+            "students_data": [],
+            "date_headers": []
+        })
 
+    students_data = []
+    date_headers = []
 
-# 6. 出欠席状況画面 (attendanceStatus.html)
-@app.get("/attendanceStatus", response_class=HTMLResponse)
-async def attendance_status(request: Request):
-    return render_page(request, "attendanceStatus.html")
-
-
-# 7. ユーザー管理画面 (userManagement.html)
-@app.get("/userManagement", response_class=HTMLResponse)
-async def user_management(request: Request):
-    return render_page(request, "userManagement.html")
-
-
-# 8. パスワード変更画面 (passwordChange.html)
-@app.get("/passwordChange", response_class=HTMLResponse)
-async def password_change(request: Request):
-    return render_page(request, "passwordChange.html")
-
-
-# ==========================================
-#  API (非同期通信用)
-# ==========================================
-
-# API 1: OTP生成と授業セッション開始 (先生が実行)
-@app.post("/api/generate_otp")
-async def generate_otp(req: GenerateOTPRequest):
-    val = random.randint(0, 15)
-    binary_str = format(val, '04b')
-    current_date = datetime.date.today().strftime('%Y-%m-%d')
-
-    sql = text("""
-        INSERT INTO class_sessions (class_id, date, sound_token)
-        VALUES (:cid, :date, :token)
-        RETURNING session_id
-    """)
-    
     try:
         with engine.connect() as conn:
-            # req.class_id を使用
-            result = conn.execute(sql, {
-                "cid": req.class_id,
-                "date": current_date,
-                "token": str(val)
-            })
-            conn.commit()
-            new_id = result.fetchone()[0]
-            print(f"✅ Session Started: ID={new_id}, classID={req.class_id}, Token={val}")
-        
-        return JSONResponse({"otp_binary": binary_str, "otp_display": val})
-        
-    except Exception as e:
-        print(f"❌ DB Error (generate_otp): {e}")
-        return JSONResponse({"error": "Database error"}, status_code=500)
-
-
-# API 2: 出席確認 (生徒が実行)
-@app.post("/api/check_attend")
-async def check_attend(req: CheckAttendRequest, request: Request):
-    student_otp = req.otp_value
-    student_id = request.session.get("user_id")
-
-    if not student_id:
-         print("⚠ Warning: No student ID found in session.")
-         student_id = "guest_unknown"
-
-    print(f"📝 Received OTP: {student_otp} from {student_id}")
-
-    sql_get_session = text("""
-        SELECT session_id, sound_token 
-        FROM class_sessions 
-        ORDER BY session_id DESC 
-        LIMIT 1
-    """)
-    
-    try:
-        with engine.connect() as conn:
-            session_row = conn.execute(sql_get_session).fetchone()
+            # -------------------------------------------------------
+            # 1. データの準備
+            # -------------------------------------------------------
             
-            if not session_row:
-                return JSONResponse({"status": "error", "message": "授業が開催されていません"})
+            # クラス名から class_id を取得 (セッション検索用)
+            # ※ studentsテーブルは文字列(homeroom_class)で結合、sessionsはIDで結合しているため
+            class_row = conn.execute(
+                text("SELECT class_id FROM classes WHERE class_name = :name"),
+                {"name": class_name}
+            ).fetchone()
             
-            current_session_id = session_row.session_id
-            correct_otp = int(session_row.sound_token)
+            if not class_row:
+                return render_page(request, "attendanceResult.html", {
+                    "error": "指定されたクラスが見つかりません",
+                    "students_data": [], 
+                    "date_headers": []
+                })
             
-            if student_otp == correct_otp:
-                sql_insert_result = text("""
-                    INSERT INTO attendance_results (session_id, student_number, status, note)
-                    VALUES (:sess_id, :stu_num, '出席', 'アプリから')
+            target_class_id = class_row.class_id
+
+            # -------------------------------------------------------
+            # 2. 必要なデータをDBから取得
+            # -------------------------------------------------------
+
+            # (A) 生徒一覧を取得 (行の基準)
+            sql_students = text("""
+                SELECT student_number, name, attendance_no 
+                FROM students 
+                WHERE homeroom_class = :c_name 
+                ORDER BY attendance_no
+            """)
+            students_rows = conn.execute(sql_students, {"c_name": class_name}).fetchall()
+
+            # (B) 対象期間・対象クラスの授業セッションを取得 (列の基準)
+            sql_sessions = text("""
+                SELECT session_id, date 
+                FROM class_sessions 
+                WHERE class_id = :cid 
+                  AND date >= :start 
+                  AND date <= :end
+                ORDER BY date, session_id
+            """)
+            sessions_rows = conn.execute(sql_sessions, {
+                "cid": target_class_id,
+                "start": start_date,
+                "end": end_date
+            }).fetchall()
+
+            # セッションIDリスト作成
+            session_ids = [row.session_id for row in sessions_rows]
+
+            # (C) 出席結果を一括取得
+            attendance_map = {} # キー: (student_number, session_id), 値: status
+            
+            if session_ids:
+                # tuple(session_ids) で IN句に渡す
+                # ※SQLAlchemyでのIN句の扱いに注意が必要ですが、ここではtext構文+バインドパラメータ展開で簡易実装
+                # session_idsが空でない場合のみ実行
+                
+                # パラメータ名を動的に生成 (:id0, :id1...) してバインド
+                bind_params = {f"id{i}": sid for i, sid in enumerate(session_ids)}
+                bind_keys = ", ".join([f":{k}" for k in bind_params.keys()])
+                
+                sql_results = text(f"""
+                    SELECT student_number, session_id, status 
+                    FROM attendance_results 
+                    WHERE session_id IN ({bind_keys})
                 """)
                 
-                conn.execute(sql_insert_result, {
-                    "sess_id": current_session_id,
-                    "stu_num": student_id
-                })
-                conn.commit()
-                print(f"🎉 Attendance Recorded: {student_id}")
-                return JSONResponse({"status": "success", "message": "出席登録完了"})
+                results_rows = conn.execute(sql_results, bind_params).fetchall()
+                
+                for r in results_rows:
+                    attendance_map[(r.student_number, r.session_id)] = r.status
+
+            # -------------------------------------------------------
+            # 3. データの整形 (テンプレートで扱いやすい形に変換)
+            # -------------------------------------------------------
+
+            # 日付ごとにセッションIDをまとめる (1日複数コマ対応)
+            # sessions_by_date = { '2025-11-16': [id1, id2], ... }
+            sessions_by_date = defaultdict(list)
+            for row in sessions_rows:
+                sessions_by_date[row.date].append(row.session_id)
             
-            else:
-                return JSONResponse({"status": "error", "message": f"コード不一致 (正解は{correct_otp})"})
+            # 列ヘッダー用日付リスト
+            date_headers = sorted(sessions_by_date.keys())
+
+            # 生徒ごとのデータ構築
+            for stu in students_rows:
+                stu_record = {
+                    "number": stu.attendance_no,
+                    "student_number": stu.student_number,
+                    "name": stu.name,
+                    "dates": {} # 日付をキーにしたステータスリスト
+                }
+
+                for d in date_headers:
+                    day_session_ids = sessions_by_date[d]
+                    day_statuses = []
+
+                    for i, sess_id in enumerate(day_session_ids):
+                        raw_status = attendance_map.get((stu.student_number, sess_id))
+                        
+                        # 表示用データ作成
+                        status_data = {
+                            "period": i + 1, # 何コマ目か
+                            "class": "no-data",
+                            "text": "データなし" # 欠席ではなく未登録状態
+                        }
+
+                        # DBの値をCSSクラスに変換
+                        if raw_status == "出席":
+                            status_data.update({"class": "attend", "text": "出席"})
+                        elif raw_status == "欠席":
+                            status_data.update({"class": "absent", "text": "欠席"})
+                        elif raw_status == "遅刻":
+                            status_data.update({"class": "late", "text": "遅刻"})
+                        elif raw_status == "早退":
+                            status_data.update({"class": "early", "text": "早退"})
+                        elif raw_status == "公欠":
+                            status_data.update({"class": "public-abs", "text": "公欠"})
+                        
+                        day_statuses.append(status_data)
+
+                    stu_record["dates"][d] = day_statuses
+
+                students_data.append(stu_record)
 
     except Exception as e:
-        print(f"❌ DB Error (check_attend): {e}")
-        return JSONResponse({"status": "error", "message": "サーバーエラーが発生しました"})
+        print(f"❌ Error in attendanceResult: {e}")
+        return render_page(request, "attendanceResult.html", {"error": "データ取得中にエラーが発生しました"})
+
+    return render_page(request, "attendanceResult.html", {
+        "class_name": class_name,
+        "start_date": start_date,
+        "end_date": end_date,
+        "date_headers": date_headers,   # 日付リスト
+        "students_data": students_data, # 整形済みデータ
+    })

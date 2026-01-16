@@ -7,9 +7,15 @@
 {% endblock %}
 
 {% block content %}
-    <h1>R1A2　11月16日から11月28日までの出欠席</h1>
+    <h1>{{ class_name }}　{{ start_date }} から {{ end_date }} までの出欠席</h1>
 
     <div class="result-container">
+        {% if error %}
+            <div style="color: red; font-weight: bold; text-align: center; margin-bottom: 20px;">
+                {{ error }}
+            </div>
+        {% endif %}
+
         <div class="action-bar">
             <button id="download-btn" class="download-btn">ダウンロード</button>
         </div>
@@ -20,86 +26,45 @@
                     <tr>
                         <th class="fixed-col">出席番号</th>
                         <th class="fixed-col name-col">氏名</th>
-                        <th>16日</th>
-                        <th>17日</th>
-                        <th>18日</th>
-                        <th>19日</th>
-                        <th>20日</th>
-                        <th>21日</th>
-                        <th>22日</th>
+                        {% for date in date_headers %}
+                            <th>{{ date }}</th>
+                        {% endfor %}
                     </tr>
                 </thead>
                 <tbody>
+                    {% for student in students_data %}
                     <tr>
-                        <td class="fixed-col student-id">13</td>
-                        <td class="fixed-col name-col student-name">円形歩道</td>
+                        <td class="fixed-col student-id">{{ student.number }}</td>
+                        <td class="fixed-col name-col student-name">{{ student.student_number }} <br> {{ student.name }}</td>
+                        
+                        {% for date in date_headers %}
                         <td>
                             <div class="cell-stack">
-                                <span class="status attend" data-period="1">出席</span>
-                                <span class="status attend" data-period="2">出席</span>
-                                <span class="status attend" data-period="3">出席</span>
-                                <span class="status no-data" data-period="4">データなし</span>
+                                {% if student.dates[date] %}
+                                    {% for status in student.dates[date] %}
+                                        <span class="status {{ status.class }}" data-period="{{ status.period }}">
+                                            {{ status.text }}
+                                        </span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="status no-data">-</span>
+                                {% endif %}
                             </div>
                         </td>
-                        <td><div class="cell-stack">
-                                <span class="status attend" data-period="1">出席</span>
-                                <span class="status attend" data-period="2">出席</span>
-                                <span class="status attend" data-period="3">出席</span>
-                                <span class="status attend" data-period="4">出席</span>
-                            </div>
-                        </td>
-                        <td><div class="cell-stack"><span class="status attend" data-period="1">出席</span><span class="status attend" data-period="2">出席</span><span class="status early" data-period="3">早退</span><span class="status no-data" data-period="4">データなし</span></div></td>
-                         <td><div class="cell-stack"><span class="status attend" data-period="1">出席</span><span class="status attend" data-period="2">出席</span><span class="status attend" data-period="3">出席</span><span class="status no-data" data-period="4">データなし</span></div></td>
-                         <td><div class="cell-stack"><span class="status attend" data-period="1">出席</span><span class="status attend" data-period="2">出席</span><span class="status attend" data-period="3">出席</span><span class="status no-data" data-period="4">データなし</span></div></td>
-                         <td><div class="cell-stack"><span class="status attend" data-period="1">出席</span><span class="status attend" data-period="2">出席</span><span class="status attend" data-period="3">出席</span><span class="status no-data" data-period="4">データなし</span></div></td>
-                         <td><div class="cell-stack"><span class="status attend" data-period="1">出席</span><span class="status attend" data-period="2">出席</span><span class="status attend" data-period="3">出席</span><span class="status no-data" data-period="4">データなし</span></div></td>
+                        {% endfor %}
                     </tr>
-                    </tbody>
+                    {% endfor %}
+                </tbody>
             </table>
         </div>
     </div>
-
+    
     <button id="back-btn" class="back-btn">戻る</button>
-
+    {% include "parts/_status_modal.html" ignore missing %}
     <div id="change-status-modal" class="modal-overlay">
         <div class="modal-content change-modal-content">
             <h2>出欠席状態の変更</h2>
-            
-            <div class="modal-info">
-                <div class="info-row">
-                    <span class="info-label">出席番号</span>
-                    <span id="modal-student-id" class="info-value">--</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">氏名</span>
-                    <span id="modal-student-name" class="info-value">--</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">変更日</span>
-                    <span id="modal-date" class="info-value">--</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">変更コマ</span>
-                    <span id="modal-period" class="info-value">--</span>
-                </div>
-            </div>
-
-            <div class="modal-form-area">
-                <label class="modal-select-label">出欠席状態の選択</label>
-                <div class="select-wrapper modal-select-wrapper">
-                    <select id="modal-status-select">
-                        <option value="attend">出席</option>
-                        <option value="absent">欠席</option>
-                        <option value="late">遅刻</option>
-                        <option value="early">早退</option>
-                        <option value="public-abs">公欠</option>
-                        <option value="special-abs">特欠</option>
-                        <option value="no-data">データなし</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="modal-btn-area">
+             <div class="modal-btn-area">
                 <button id="modal-cancel-btn" class="modal-btn cancel-btn">戻る</button>
                 <button id="modal-save-btn" class="modal-btn save-btn">変更</button>
             </div>
