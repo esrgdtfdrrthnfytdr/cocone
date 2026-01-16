@@ -2,7 +2,7 @@ import os
 import sys
 import random
 import datetime
-from datetime import timedelta  # 日付計算用に追記
+from datetime import timedelta # 追加: 日付計算用
 from typing import Optional
 from collections import defaultdict
 
@@ -46,7 +46,7 @@ engine = create_engine(
 
 # --- Pydanticモデル (APIのリクエストボディ用) ---
 class GenerateOTPRequest(BaseModel):
-    # フロントエンドから文字列で来る可能性があるため Optional[str] で受け、内部で変換
+    # 文字列として受け取り、内部で変換する
     class_id: Optional[str] = None
 
 class CheckAttendRequest(BaseModel):
@@ -159,7 +159,7 @@ async def roll_call(request: Request):
     if role != "teacher":
         return RedirectResponse(url="/", status_code=303)
 
-    # DBから担当クラスを取得して渡す (プルダウン用)
+    # DBから担当クラスを取得して渡す
     classes = get_teacher_classes(user_id)
     return render_page(request, "rollCall.html", {"classes": classes})
 
@@ -180,7 +180,7 @@ async def attendance_filter(request: Request):
     if role != "teacher":
         return RedirectResponse(url="/", status_code=303)
 
-    # DBから担当クラスを取得して渡す (プルダウン用)
+    # DBから担当クラスを取得して渡す
     classes = get_teacher_classes(user_id)
     return render_page(request, "attendanceFilter.html", {"classes": classes})
 
@@ -203,28 +203,26 @@ async def attendance_result(
 
     students_data = []
     
-    # --- 1. 日付ヘッダーリストの生成 (DBデータ有無に関わらず列を作る) ---
+    # --- 修正: 日付リストを検索範囲から強制的に生成する ---
+    # これにより、DBにデータがない日も列として表示されます
     date_headers = []
     try:
         s_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
         e_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
         delta = e_date - s_date
         
-        # 開始日から終了日までの日付文字列リストを作成
         for i in range(delta.days + 1):
             day = s_date + timedelta(days=i)
             date_headers.append(day.strftime('%Y-%m-%d'))
             
     except ValueError:
-        return render_page(request, "attendanceResult.html", {
-            "error": "日付の形式が不正です",
-            "students_data": [], 
-            "date_headers": []
-        })
+        return render_page(request, "attendanceResult.html", {"error": "日付の形式が不正です"})
 
     try:
         with engine.connect() as conn:
-            # --- 2. クラスIDの特定 ---
+            # -------------------------------------------------------
+            # 1. クラスIDの特定
+            # -------------------------------------------------------
             class_row = conn.execute(
                 text("SELECT class_id FROM classes WHERE class_name = :name"),
                 {"name": class_name}
@@ -239,7 +237,9 @@ async def attendance_result(
             
             target_class_id = class_row.class_id
 
-            # --- 3. データの取得 ---
+            # -------------------------------------------------------
+            # 2. データの取得
+            # -------------------------------------------------------
 
             # (A) 生徒一覧 (行)
             sql_students = text("""
@@ -278,13 +278,17 @@ async def attendance_result(
                     FROM attendance_results 
                     WHERE session_id IN ({bind_keys})
                 """)
+                
                 results_rows = conn.execute(sql_results, bind_params).fetchall()
+                
                 for r in results_rows:
                     attendance_map[(r.student_number, r.session_id)] = r.status
 
-            # --- 4. データの整形 ---
+            # -------------------------------------------------------
+            # 3. データの整形
+            # -------------------------------------------------------
 
-            # 日付ごとにセッションIDをまとめる
+            # DBにあるセッションを日付ごとに整理
             sessions_by_date = defaultdict(list)
             for row in sessions_rows:
                 sessions_by_date[row.date].append(row.session_id)
@@ -302,9 +306,8 @@ async def attendance_result(
                 for d in date_headers:
                     day_statuses = []
                     
-                    # その日に授業セッションがあるか確認
+                    # その日に授業セッションがあるか？
                     if d in sessions_by_date and sessions_by_date[d]:
-                        # 授業がある場合、各コマのステータスを取得
                         day_session_ids = sessions_by_date[d]
                         for i, sess_id in enumerate(day_session_ids):
                             raw_status = attendance_map.get((stu.student_number, sess_id))
@@ -314,7 +317,7 @@ async def attendance_result(
                                 "class": "no-data",
                                 "text": "データなし"
                             }
-                            # DBの値を表示用クラス・テキストに変換
+                            # DBの値を表示用に変換
                             if raw_status == "出席":
                                 status_data.update({"class": "attend", "text": "出席"})
                             elif raw_status == "欠席":
@@ -329,11 +332,16 @@ async def attendance_result(
                                 status_data.update({"class": "special-abs", "text": "特欠"})
                             
                             day_statuses.append(status_data)
+                    
                     else:
-                        # 授業がない日 (DBデータなし)
-                        # 空リストのままだとテンプレート側で「データなし(-)1個」などが表示される想定
-                        # ※テンプレートの実装に依存します
-                        pass
+                        # --- 修正: 授業データがない日も「データなし」を4コマ分埋める ---
+                        # デザインに合わせて4コマ固定としています
+                        for i in range(1, 5):
+                            day_statuses.append({
+                                "period": i,
+                                "class": "no-data",
+                                "text": "データなし"
+                            })
 
                     stu_record["dates"][d] = day_statuses
 
@@ -382,7 +390,6 @@ async def generate_otp(req: GenerateOTPRequest):
     current_date = datetime.date.today().strftime('%Y-%m-%d')
 
     # プルダウン統合: クラスIDが送られてきた場合は保存する
-    # 送られてこない(空文字/None)の場合は NULL を入れる
     cid_val = None
     if req.class_id and str(req.class_id).strip():
         try:

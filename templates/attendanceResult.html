@@ -35,8 +35,7 @@
                     {% for student in students_data %}
                     <tr>
                         <td class="fixed-col student-id">{{ student.number }}</td>
-                        <td class="fixed-col name-col student-name">{{ student.student_number }} <br> {{ student.name }}</td>
-                        
+                        <td class="fixed-col name-col student-name">{{ student.name }}</td>                        
                         {% for date in date_headers %}
                         <td>
                             <div class="cell-stack">
