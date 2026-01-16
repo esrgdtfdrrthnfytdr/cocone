@@ -99,6 +99,10 @@ select {
     animation: sonar-wave-out 1.5s infinite ease-out 0.5s;
 }
 
+#status-area:empty {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .select-wrapper {
         width: 220px;
