@@ -1,11 +1,8 @@
 {% if is_teacher %}
     <a href="/rollCall">出席確認</a>
-    <a href="/register">出席登録</a>
     <a href="/attendanceFilter">出欠席絞り込み</a>
     <a href="/userManagement">ユーザー管理</a>
 {% else %}
     <a href="/register">出席登録</a>
-    <a href="/attendanceFilter">出欠席絞り込み</a>
-    <a href="#">ユーザー登録</a>
 {% endif %}
 <a href="/logout">ログアウト</a>
