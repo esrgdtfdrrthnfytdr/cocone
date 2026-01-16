@@ -50,7 +50,7 @@
                 <select id="course-select">
                     <option value="" disabled selected>クラスを選択してください</option>
                     {% for class in classes %}
-                        <option value="{{ class.id }}">{{ class.name }}</option>
+                        <option value="{{ class.class_id }}">{{ class.class_name }}</option>
                     {% endfor %}
                 </select>
             </div>
