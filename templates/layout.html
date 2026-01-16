@@ -40,6 +40,7 @@
 
     <main>
         {% block content %}{% endblock %}
+        <p>Debug: Role={{ request.session.get('role') }}, IsTeacher={{ is_teacher }}</p>
     </main>
 
     <script src="{{ url_for('static', path='/js/common.js') }}"></script>
