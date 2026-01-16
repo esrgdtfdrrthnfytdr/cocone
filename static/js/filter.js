@@ -17,16 +17,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // 検索処理のシミュレーション
-            console.log('検索条件:', {
-                class: classSelect.value,
-                start: startDate.value,
-                end: endDate.value
+            // URLパラメータを作成
+            const params = new URLSearchParams({
+                class_name: classSelect.value,
+                start_date: startDate.value,
+                end_date: endDate.value
             });
 
-            // 遷移（結果画面としての attendanceStatus.html へ）
-            // 実際はクエリパラメータなどを付与して遷移します
-            window.location.href = 'attendanceStatus.html';
+            // 遷移 (例: /attendanceResult?class_name=R4A1&start_date=2025-11-01...)
+            window.location.href = `/attendanceResult?${params.toString()}`;
         });
     }
 });

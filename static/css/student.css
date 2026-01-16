@@ -1,19 +1,20 @@
 @charset "UTF-8";
 
-/* --- 受信（収束）アニメーション --- */
-/* 外側からボタンに向かって縮まる波 */
+main {
+    justify-content: center;
+}
 
 @keyframes signal-receive-in {
     0% {
-        transform: scale(1.8); /* ボタンより大きい状態から開始 */
+        transform: scale(1.8);
         opacity: 0;
     }
     30% {
-        opacity: 0.3; /* 修正: 0.6だと濃すぎるため0.3に変更 */
+        opacity: 0.3;
     }
     100% {
-        transform: scale(1); /* ボタンのサイズに収束 */
-        opacity: 0; /* 吸い込まれるように消える */
+        transform: scale(1);
+        opacity: 0;
     }
 }
 
@@ -34,15 +35,13 @@
     opacity: 0;
 }
 
-/* ease-in を使うことで、終わりにかけて加速＝吸い込まれる感を出す */
 .circle-button.is-processing::before {
     animation: signal-receive-in 1.5s infinite ease-in;
 }
 
 .circle-button.is-processing::after {
-    animation: signal-receive-in 1.5s infinite ease-in 0.75s; /* ずらして開始 */
+    animation: signal-receive-in 1.5s infinite ease-in 0.75s;
 }
-
 
 /* --- モーダルウィンドウ --- */
 .modal-overlay {

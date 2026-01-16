@@ -1,6 +1,17 @@
 @charset "UTF-8";
 
-/* --- フォーム要素 --- */
+main {
+    justify-content: center;
+}
+
+.form-container {
+    display: none;
+}
+
+#submit-btn {
+    margin-top: 0;
+}
+
 label {
     font-weight: 700;
     font-size: 14px;
@@ -52,8 +63,6 @@ select {
 }
 
 /* --- 送信（発信）アニメーション --- */
-/* ボタンから外側へ広がる波 */
-
 @keyframes sonar-wave-out {
     0% {
         transform: scale(1);
@@ -90,18 +99,12 @@ select {
     animation: sonar-wave-out 1.5s infinite ease-out 0.5s;
 }
 
+#status-area:empty {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .select-wrapper {
         width: 220px;
     }
-}
-
-/* セレクトボックスのコンテナ全体を非表示にする（余白ごと消す） */
-.form-container {
-    display: none;
-}
-
-/* 念のため、出席確認ボタンの位置バランスを調整（必要に応じて数値を変更してください） */
-#submit-btn {
-    margin-top: 50px;
 }
