@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
         backBtn.addEventListener('click', function() {
-            window.location.href = 'attendanceFilter.html';
+            // 修正: ファイル名ではなく、FastAPIで設定したURLパスへ遷移させる
+            window.location.href = '/attendanceFilter';
         });
     }
 
@@ -38,51 +39,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 1. 親の行(tr)から出席番号と氏名を取得
             const row = cell.closest('tr');
-            const studentId = row.querySelector('.student-id').textContent;
-            const studentName = row.querySelector('.student-name').textContent;
+            // student-id要素がない場合は空文字
+            const studentIdEl = row.querySelector('.student-id');
+            const studentId = studentIdEl ? studentIdEl.textContent : '';
+            
+            const studentNameEl = row.querySelector('.student-name');
+            const studentName = studentNameEl ? studentNameEl.textContent : '';
 
             // 2. 列インデックスから日付を取得
-            // .cell-stack の親 td のインデックスを探す
             const cellTd = cell.closest('td');
             const allTds = Array.from(row.children);
             const tdIndex = allTds.indexOf(cellTd);
             
             // ヘッダー行を取得して、同じインデックスのテキスト(日付)を取得
             const headerRow = document.querySelector('.result-table thead tr');
-            const targetHeader = headerRow.children[tdIndex];
+            const targetHeader = headerRow ? headerRow.children[tdIndex] : null;
             const dateText = targetHeader ? targetHeader.textContent : '不明な日付';
 
-            // 3. コマ数を取得 (data-period属性 または 親内でのインデックス)
+            // 3. コマ数を取得
             let periodText = cell.dataset.period ? cell.dataset.period + 'コマ目' : '不明';
-            // data属性がない場合のフォールバック（インデックスから計算）
             if(periodText === '不明') {
                 const stack = cell.closest('.cell-stack');
-                const indexInStack = Array.from(stack.children).indexOf(cell);
-                periodText = (indexInStack + 1) + 'コマ目';
+                if (stack) {
+                    const indexInStack = Array.from(stack.children).indexOf(cell);
+                    periodText = (indexInStack + 1) + 'コマ目';
+                }
             }
 
             // 4. モーダルに情報をセット
-            modalId.textContent = studentId;
-            modalName.textContent = studentName;
-            modalDate.textContent = dateText;
-            modalPeriod.textContent = periodText;
+            if (modalId) modalId.textContent = studentId;
+            if (modalName) modalName.textContent = studentName;
+            if (modalDate) modalDate.textContent = dateText;
+            if (modalPeriod) modalPeriod.textContent = periodText;
 
-            // 5. 現在のクラスからセレクトボックスの初期値を推測してセット（簡易実装）
-            if (cell.classList.contains('attend')) modalSelect.value = 'attend';
-            else if (cell.classList.contains('absent')) modalSelect.value = 'absent';
-            else if (cell.classList.contains('late')) modalSelect.value = 'late';
-            else if (cell.classList.contains('early')) modalSelect.value = 'early';
-            else if (cell.classList.contains('public-abs')) modalSelect.value = 'public-abs';
-            else if (cell.classList.contains('special-abs')) modalSelect.value = 'special-abs';
-            else modalSelect.value = 'no-data';
+            // 5. 現在のクラスからセレクトボックスの初期値を推測してセット
+            if (modalSelect) {
+                if (cell.classList.contains('attend')) modalSelect.value = 'attend';
+                else if (cell.classList.contains('absent')) modalSelect.value = 'absent';
+                else if (cell.classList.contains('late')) modalSelect.value = 'late';
+                else if (cell.classList.contains('early')) modalSelect.value = 'early';
+                else if (cell.classList.contains('public-abs')) modalSelect.value = 'public-abs';
+                else if (cell.classList.contains('special-abs')) modalSelect.value = 'special-abs';
+                else modalSelect.value = 'no-data';
+            }
 
             // モーダル表示
-            modal.classList.add('active');
+            if (modal) modal.classList.add('active');
         });
     });
 
     // モーダルを閉じる
-    if (modalCancelBtn) {
+    if (modalCancelBtn && modal) {
         modalCancelBtn.addEventListener('click', function() {
             modal.classList.remove('active');
             currentTargetElement = null;
@@ -90,9 +97,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 変更を保存（シミュレーション）
-    if (modalSaveBtn) {
+    if (modalSaveBtn && modal) {
         modalSaveBtn.addEventListener('click', function() {
-            if (currentTargetElement) {
+            if (currentTargetElement && modalSelect) {
                 const selectedValue = modalSelect.value;
                 const selectedText = modalSelect.options[modalSelect.selectedIndex].text;
 
