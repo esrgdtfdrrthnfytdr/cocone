@@ -44,12 +44,21 @@ engine = create_engine(
 )
 
 # --- Pydanticモデル (APIのリクエストボディ用) ---
-class GenerateOTPRequest(BaseModel):
-    class_id: int  # 修正: classe_id -> class_id
+# ===============================
+# 科目orコースありver
+# ===============================-
+# class GenerateOTPRequest(BaseModel):
+#     class_id: int  # 修正: classe_id -> class_id
+
+# class CheckAttendRequest(BaseModel):
+#     otp_value: int
+
+class GenerateOtpRequest(BaseModel):
+
+    class_id: Optional[str] = None
 
 class CheckAttendRequest(BaseModel):
     otp_value: int
-
 
 # ==========================================
 #  ルーティング: 画面遷移 (GET)
@@ -342,16 +351,30 @@ async def generate_otp(req: GenerateOTPRequest):
     """)
     
     try:
-        with engine.connect() as conn:
+        # with engine.connect() as conn:
             # req.class_id を使用
-            result = conn.execute(sql, {
-                "cid": req.class_id,
-                "date": current_date,
-                "token": str(val)
-            })
-            conn.commit()
-            new_id = result.fetchone()[0]
-            print(f"✅ Session Started: ID={new_id}, classID={req.class_id}, Token={val}")
+            # result = conn.execute(sql, {
+            #     "cid": req.class_id,
+            #     "date": current_date,
+            #     "token": str(val)
+            # })
+            # conn.commit()
+            # new_id = result.fetchone()[0]
+            # print(f"✅ Session Started: ID={new_id}, classID={req.class_id}, Token={val}")
+
+         # 【修正】クラス情報はシステム上で扱わないため、強制的に NULL (None) を設定
+        # DB側の class_id カラムが NULL許容(nullable)である必要があります
+        class_id_dummy = None 
+
+        sql = text("""
+            INSERT INTO class_sessions (class_id, date, sound_token)
+            VALUES (:cid, :date, :token)
+            RETURNING session_id
+        """)
+        
+        # :cid に class_id_dummy (None) を渡す
+        db.execute(sql, {"cid": class_id_dummy, "date": current_date, "token": str(val)})
+        db.commit()
         
         return JSONResponse({"otp_binary": binary_str, "otp_display": val})
         
