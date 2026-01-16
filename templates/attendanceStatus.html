@@ -1,135 +1,98 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>出欠席状況 | cocone</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="../static/css/common.css">
-    <link rel="stylesheet" href="../static/css/status.css">
-</head>
-<body>
-    <header>
-        <button id="hamburger-btn" class="hamburger-btn">
-            <span></span><span></span><span></span>
-        </button>
-        <div class="logo-container">
-            <img src="../static/image/cocone_white_logo.png" alt="cocone">
-        </div>
-        <nav class="pc-nav">
-            <a href="register.html">出席登録</a>
-            <a href="rollCall.html">出欠席絞り込み</a>
-            <a href="#">ユーザー登録</a>
-            <a href="#">ログアウト</a>
-        </nav>
-    </header>
+{% extends "layout.html" %}
 
-    <div id="mobile-menu" class="mobile-menu">
-        <div class="menu-background">
-            <div class="menu-header">
-                <button id="close-btn" class="close-btn">×</button>
-                <img src="../static/image/cocone_white_logo.png" alt="cocone" class="menu-logo">
-            </div>
-            <nav class="mobile-nav-links">
-                <a href="register.html">出席登録</a>
-                <a href="rollCall.html">出欠席絞り込み</a>
-                <a href="#">ユーザー登録</a>
-                <a href="#">ログアウト</a>
-            </nav>
+{% block title %}出欠席状況 | cocone{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/status.css') }}">
+{% endblock %}
+
+{% block content %}
+    <h1>出欠席状況</h1>
+
+    <div class="stats-area">
+        <div class="stat-box">
+            <div class="stat-label">本日の出席者</div>
+            <div class="stat-value value-green">63<span class="unit">人</span></div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">本日の欠席者</div>
+            <div class="stat-value value-red">3<span class="unit">人</span></div>
         </div>
     </div>
 
-    <main>
-        <h1>出欠席状況</h1>
-
-        <div class="stats-area">
-            <div class="stat-box">
-                <div class="stat-label">本日の出席者</div>
-                <div class="stat-value value-green">63<span class="unit">人</span></div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">本日の欠席者</div>
-                <div class="stat-value value-red">3<span class="unit">人</span></div>
-            </div>
+    <div class="list-section">
+        <h2>欠席者リスト</h2>
+        <div class="table-container">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>学籍番号</th>
+                        <th>出席番号</th>
+                        <th>氏名</th>
+                        <th>遅刻</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>20224444</td>
+                        <td>13</td>
+                        <td>円形歩道</td>
+                        <td><span class="status-label label-late">遅刻</span></td>
+                    </tr>
+                    <tr>
+                        <td>20224444</td>
+                        <td>13</td>
+                        <td>情報太郎</td>
+                        <td><span class="status-label label-late">遅刻</span></td>
+                    </tr>
+                    <tr>
+                        <td>20224444</td>
+                        <td>13</td>
+                        <td>菊水工業</td>
+                        <td><span class="status-label label-late">遅刻</span></td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+    </div>
 
-        <div class="list-section">
-            <h2>欠席者リスト</h2>
-            <div class="table-container">
-                <table class="status-table">
-                    <thead>
-                        <tr>
-                            <th>学籍番号</th>
-                            <th>出席番号</th>
-                            <th>氏名</th>
-                            <th>遅刻</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>20224444</td>
-                            <td>13</td>
-                            <td>円形歩道</td>
-                            <td><span class="status-label label-late">遅刻</span></td>
-                        </tr>
-                        <tr>
-                            <td>20224444</td>
-                            <td>13</td>
-                            <td>情報太郎</td>
-                            <td><span class="status-label label-late">遅刻</span></td>
-                        </tr>
-                        <tr>
-                            <td>20224444</td>
-                            <td>13</td>
-                            <td>菊水工業</td>
-                            <td><span class="status-label label-late">遅刻</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+    <div class="list-section">
+        <h2>出席者リスト</h2>
+        <div class="table-container">
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>学籍番号</th>
+                        <th>出席番号</th>
+                        <th>氏名</th>
+                        <th>早退</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>20224444</td>
+                        <td>13</td>
+                        <td>円形歩道</td>
+                        <td><span class="status-label label-early">早退</span></td>
+                    </tr>
+                    <tr>
+                        <td>20224444</td>
+                        <td>13</td>
+                        <td>情報太郎</td>
+                        <td><span class="status-label label-early">早退</span></td>
+                    </tr>
+                    <tr>
+                        <td>20224444</td>
+                        <td>13</td>
+                        <td>菊水工業</td>
+                        <td><span class="status-label label-early">早退</span></td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+    </div>
+{% endblock %}
 
-        <div class="list-section">
-            <h2>出席者リスト</h2>
-            <div class="table-container">
-                <table class="status-table">
-                    <thead>
-                        <tr>
-                            <th>学籍番号</th>
-                            <th>出席番号</th>
-                            <th>氏名</th>
-                            <th>早退</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>20224444</td>
-                            <td>13</td>
-                            <td>円形歩道</td>
-                            <td><span class="status-label label-early">早退</span></td>
-                        </tr>
-                        <tr>
-                            <td>20224444</td>
-                            <td>13</td>
-                            <td>情報太郎</td>
-                            <td><span class="status-label label-early">早退</span></td>
-                        </tr>
-                        <tr>
-                            <td>20224444</td>
-                            <td>13</td>
-                            <td>菊水工業</td>
-                            <td><span class="status-label label-early">早退</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-
-    <script src="../static/js/common.js"></script>
-    <script src="../static/js/status.js"></script>
-</body>
-</html>
+{% block extra_js %}
+    <script src="{{ url_for('static', path='/js/status.js') }}"></script>
+{% endblock %}

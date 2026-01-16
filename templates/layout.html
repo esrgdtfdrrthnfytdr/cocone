@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}cocone{% endblock %}</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <button id="hamburger-btn" class="hamburger-btn">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="logo-container">
+            <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone">
+        </div>
+        <nav class="pc-nav">
+            {% include "parts/_nav_links.html" %}
+        </nav>
+    </header>
+
+    <div id="mobile-menu" class="mobile-menu">
+        <div class="menu-background">
+            <div class="menu-header">
+                <button id="close-btn" class="close-btn">×</button>
+                <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
+            </div>
+            <nav class="mobile-nav-links">
+                {% include "parts/_nav_links.html" %}
+            </nav>
+        </div>
+    </div>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

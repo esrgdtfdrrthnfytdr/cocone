@@ -1,48 +1,12 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>出席確認｜cocone</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+{% extends "layout.html" %}
+
+{% block title %}出席確認｜cocone{% endblock %}
+
+{% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('static', path='/css/teacher.css') }}">
-</head>
-<body>
-    <header>
-        <button id="hamburger-btn" class="hamburger-btn">
-            <span></span><span></span><span></span>
-        </button>
-        <div class="logo-container">
-            <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone">
-        </div>
-        <nav class="pc-nav">
-            {% if is_teacher %}
-                <a href="/register">出席登録</a>
-                <a href="/attendanceFilter">出欠席絞り込み</a>
-                <a href="/userManagement">ユーザー管理</a>
-            {% endif %}
-            <a href="/logout">ログアウト</a>
-        </nav>
-    </header>
+{% endblock %}
 
-    <div id="mobile-menu" class="mobile-menu">
-        <div class="menu-background">
-            <div class="menu-header">
-                <button id="close-btn" class="close-btn">×</button>
-                <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
-            </div>
-            <nav class="mobile-nav-links">
-                {% if is_teacher %}
-                    <a href="/register">出席登録</a>
-                    <a href="/attendanceFilter">出欠席絞り込み</a>
-                    <a href="/userManagement">ユーザー管理</a>
-                {% endif %}
-                <a href="/logout">ログアウト</a>
-            </nav>
-        </div>
-    </div>
-
-    <main>
+{% block content %}
         <h1>出席確認</h1>
         <div class="form-container">
             <label for="course-select">対象クラスの選択</label>
@@ -74,8 +38,8 @@
         <button id="submit-btn" class="circle-button">出席確認</button>
         <div id="status-area" style="margin-top:20px; color:#666;"></div>
     </main>
+{% endblock %}
 
-    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+{% block extra_js %}
     <script src="{{ url_for('static', path='/js/teacher.js') }}"></script>
-</body>
-</html>
+{% endblock %}

@@ -1,51 +1,14 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cocone - 出席登録</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/common.css') }}">
+{% extends "layout.html" %}
+
+{% block title %}cocone - 出席登録{% endblock %}
+
+{% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('static', path='/css/student.css') }}">
-</head>
-<body>
-    <header>
-        <button id="hamburger-btn" class="hamburger-btn">
-            <span></span><span></span><span></span>
-        </button>
-        <div class="logo-container">
-            <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone">
-        </div>
-        <nav class="pc-nav">
-            <a href="/register">出席登録</a>
-            <a href="/attendanceFilter">出欠席絞り込み</a>
-            <a href="#">ユーザー登録</a>
-            <a href="/logout">ログアウト</a>
-        </nav>
-    </header>
+{% endblock %}
 
-    <div id="mobile-menu" class="mobile-menu">
-        <div class="menu-background">
-            <div class="menu-header">
-                <button id="close-btn" class="close-btn">×</button>
-                <img src="{{ url_for('static', path='/image/cocone_white_logo.png') }}" alt="cocone" class="menu-logo">
-            </div>
-            <nav class="mobile-nav-links">
-                <a href="/register">出席登録</a>
-                <a href="/attendanceFilter">出欠席絞り込み</a>
-                <a href="#">ユーザー登録</a>
-                <a href="/logout">ログアウト</a>
-            </nav>
-        </div>
-    </div>
-
-    <main>
-        <h1>出席登録</h1>
-        <button id="register-btn" class="circle-button">出席登録</button>
-    </main>
+{% block content %}
+    <h1>出席登録</h1>
+    <button id="register-btn" class="circle-button">出席登録</button>
 
     <div id="completion-modal" class="modal-overlay">
         <div class="modal-content">
@@ -71,8 +34,8 @@
             <button id="modal-close-btn" class="modal-close-btn">閉じる</button>
         </div>
     </div>
+{% endblock %}
 
-    <script src="{{ url_for('static', path='/js/common.js') }}"></script>
+{% block extra_js %}
     <script src="{{ url_for('static', path='/js/student.js') }}"></script>
-</body>
-</html>
+{% endblock %}
