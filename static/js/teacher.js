@@ -68,15 +68,13 @@ window.addEventListener('load', async () => {
 });
 
 
-// ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
-// 科目情報がほしいならこれを再利用して
-// ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
-// // if (submitBtn) {
-//     submitBtn.addEventListener('click', async () => {
-//         if (isScanning) {
-//             stopSound();
-//             return;
-//         }
+
+if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+        if (isScanning) {
+            stopSound();
+            return;
+        }
 
 //         // 科目が選択されているかチェック
 //         const selectedValue = courseSelect ? courseSelect.value : null;
@@ -87,37 +85,38 @@ window.addEventListener('load', async () => {
 //             }
 //             return;
 //         }
-//         if(errorMessage) {
-//             errorMessage.textContent = '';
-//             errorMessage.classList.remove('show');
-//         }
 
-//         if (audioCtx && audioCtx.state === 'suspended') {
-//             await audioCtx.resume();
-//         }
+        if(errorMessage) {
+            errorMessage.textContent = '';
+            errorMessage.classList.remove('show');
+        }
 
-//         try {
-//             // APIへPOST送信 (course_id を含める)
-//             const res = await fetch('/api/generate_otp', { 
-//                 method: 'POST',
-//                 headers: { 'Content-Type': 'application/json' },
-//                 body: JSON.stringify({ course_id: parseInt(selectedValue) })
-//             });
+        if (audioCtx && audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+        try {
+            // APIへPOST送信 (course_id を含める)
+            const res = await fetch('/api/generate_otp', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})  //空データ
+                // body: JSON.stringify({ course_id: parseInt(selectedValue) })コースID
+            });
             
-//             if (!res.ok) {
-//                 throw new Error("Server Response Error");
-//             }
+            if (!res.ok) {
+                throw new Error("Server Response Error");
+            }
 
-//             const data = await res.json();
+            const data = await res.json();
             
-//             startScanningUI();
-//             playMixedSoundLoop(data.otp_binary);
-//         } catch(e) {
-//             console.error(e);
-//             alert("通信エラーが発生しました");
-//         }
-//     });
-// }
+            startScanningUI();
+            playMixedSoundLoop(data.otp_binary);
+        } catch(e) {
+            console.error(e);
+            alert("通信エラーが発生しました");
+        }
+    });
+}
 
 function startScanningUI() {
     isScanning = true;
