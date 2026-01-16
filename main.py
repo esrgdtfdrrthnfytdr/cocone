@@ -147,8 +147,12 @@ async def roll_call(request: Request):
         print(f"DB Error (Fetching classes): {e}")
 
     # クラス名（"R4A1"）を渡す
-    return render_page(request, "rollCall.html", "teacher_name": request.session.get('user_name', 'Teacher'), {"classes": class_name})
-
+    # テンプレートへ渡す (修正版)
+    return templates.TemplateResponse("rollCall.html", {
+        "request": request,
+        "teacher_name": request.session.get('user_name', 'Teacher'),
+        "classes": classes_list
+    })
 
 # 3. 生徒用: 出席登録画面 (register.html)
 @app.get("/register", response_class=HTMLResponse)
