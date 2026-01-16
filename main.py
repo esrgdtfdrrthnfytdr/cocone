@@ -45,7 +45,10 @@ engine = create_engine(
 
 # --- Pydanticモデル (APIのリクエストボディ用) ---
 class GenerateOTPRequest(BaseModel):
-    class_id: int
+    # ▼ 修正前: 必須項目(int)
+    # class_id: int
+    # ▼ 修正後: 任意項目(Optional)に変更
+    class_id: Optional[str] = None
 
 class CheckAttendRequest(BaseModel):
     otp_value: int
@@ -373,15 +376,24 @@ async def generate_otp(req: GenerateOTPRequest):
     
     try:
         with engine.connect() as conn:
-            # req.class_id を使用してDBに保存
+            # ▼ 修正前: req.class_id を使用してDBに保存
+            # result = conn.execute(sql, {
+            #     "cid": req.class_id,
+            #     "date": current_date,
+            #     "token": str(val)
+            # })
+
+            # ▼ 修正後: クラス情報はシステム上で扱わない方針のため、強制的に NULL を設定
+            # (フロントから class_id が送られてきても無視します)
             result = conn.execute(sql, {
-                "cid": req.class_id,
+                "cid": None, 
                 "date": current_date,
                 "token": str(val)
             })
+            
             conn.commit()
             new_id = result.fetchone()[0]
-            print(f"✅ Session Started: ID={new_id}, classID={req.class_id}, Token={val}")
+            print(f"✅ Session Started: ID={new_id}, classID=None, Token={val}")
         
         return JSONResponse({"otp_binary": binary_str, "otp_display": val})
         
