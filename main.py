@@ -44,7 +44,7 @@ engine = create_engine(
 
 # --- Pydanticモデル (APIのリクエストボディ用) ---
 class GenerateOTPRequest(BaseModel):
-    course_id: int
+    classe_id: int
 
 class CheckAttendRequest(BaseModel):
     otp_value: int
@@ -137,17 +137,17 @@ async def roll_call(request: Request):
         return RedirectResponse(url="/", status_code=303)
 
     # 担当科目をDBから取得
-    courses_list = []
+    classes_list = []
     try:
         with engine.connect() as conn:
             sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
             rows = conn.execute(sql, {"tid": user_id}).fetchall()
-            classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
+            classes_list = [{"class_id": c.class_id, "class_name": c.class_name} for c in rows]
     except Exception as e:
-        print(f"DB Error (Fetching Courses): {e}")
+        print(f"DB Error (Fetching classes): {e}")
 
     # クラス名（"R4A1"）を渡す
-    return render_page(request, "rollCall.html", {"classes": class_name})
+    return render_page(request, "rollCall.html", "teacher_name": request.session.get('user_name', 'Teacher'), {"classes": class_name})
 
 
 # 3. 生徒用: 出席登録画面 (register.html)
@@ -200,9 +200,9 @@ async def generate_otp(req: GenerateOTPRequest):
     current_date = datetime.date.today().strftime('%Y-%m-%d')
 
     # 2. データベースに「授業セッション」を保存
-    # 受け取った course_id を使用する
+    # 受け取った class_id を使用する
     sql = text("""
-        INSERT INTO class_sessions (course_id, date, sound_token)
+        INSERT INTO class_sessions (class_id, date, sound_token)
         VALUES (:cid, :date, :token)
         RETURNING session_id
     """)
@@ -210,13 +210,13 @@ async def generate_otp(req: GenerateOTPRequest):
     try:
         with engine.connect() as conn:
             result = conn.execute(sql, {
-                "cid": req.course_id,
+                "cid": req.classe_id,
                 "date": current_date,
                 "token": str(val)
             })
             conn.commit()
             new_id = result.fetchone()[0]
-            print(f"✅ Session Started: ID={new_id}, CourseID={req.course_id}, Token={val}")
+            print(f"✅ Session Started: ID={new_id}, classeID={req.classe_id}, Token={val}")
         
         return JSONResponse({"otp_binary": binary_str, "otp_display": val})
         
