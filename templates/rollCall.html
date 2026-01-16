@@ -48,9 +48,9 @@
             <label for="course-select">対象科目の選択</label>
             <div class="select-wrapper">
                 <select id="course-select">
-                    <option value="" disabled selected>科目を選択してください</option>
+                    <option value="" disabled selected>クラスを選択してください</option>
                     {% for course in courses %}
-                        <option value="{{ course.id }}">{{ course.name }}</option>
+                        <option value="{{ class.id }}">{{ class.name }}</option>
                     {% endfor %}
                 </select>
             </div>
