@@ -14,10 +14,15 @@
             <div class="section-title">対象クラスの選択</div>
             <div class="select-wrapper">
                 <select id="class-select">
-                    <option value="" disabled selected></option>
-                    <option value="class-a">Aクラス</option>
-                    <option value="class-b">Bクラス</option>
-                    <option value="class-c">Cクラス</option>
+                    <option value="" disabled selected>クラスを選択してください</option>
+                    
+                    {% for class_item in classes %}
+                        <option value="{{ class_item.name }}">{{ class_item.name }}</option>
+                    {% endfor %}
+                    
+                    {% if not classes %}
+                        <option value="" disabled>担当クラスがありません</option>
+                    {% endif %}
                 </select>
             </div>
         </div>
