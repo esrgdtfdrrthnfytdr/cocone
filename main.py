@@ -140,14 +140,14 @@ async def roll_call(request: Request):
     courses_list = []
     try:
         with engine.connect() as conn:
-            sql = text("SELECT course_id, course_name FROM courses WHERE teacher_id = :tid")
+            sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
             rows = conn.execute(sql, {"tid": user_id}).fetchall()
-            courses_list = [{"id": r.course_id, "name": r.course_name} for r in rows]
+            classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
     except Exception as e:
         print(f"DB Error (Fetching Courses): {e}")
 
-    # 科目リストを渡して描画
-    return render_page(request, "rollCall.html", {"courses": courses_list})
+    # クラス名（"R4A1"）を渡す
+    return render_page(request, "rollCall.html", {"classes": class_name})
 
 
 # 3. 生徒用: 出席登録画面 (register.html)
