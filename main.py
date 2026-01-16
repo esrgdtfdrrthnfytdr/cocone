@@ -44,7 +44,7 @@ engine = create_engine(
 
 # --- Pydanticモデル (APIのリクエストボディ用) ---
 class GenerateOTPRequest(BaseModel):
-    classe_id: int
+    class_id: int  # 修正: classe_id -> class_id (JS側と合わせる)
 
 class CheckAttendRequest(BaseModel):
     otp_value: int
@@ -112,12 +112,14 @@ async def logout(request: Request):
 # --- 共通ヘルパー: ページ描画と権限チェック ---
 def render_page(request: Request, template_name: str, extra_context: dict = None):
     role = request.session.get("role")
+    # ログインしていない場合はトップへ
     if not role:
         return RedirectResponse(url="/", status_code=303)
     
+    # 共通コンテキストの作成
     context = {
         "request": request,
-        "is_teacher": (role == "teacher"),
+        "is_teacher": (role == "teacher"),  # ここでヘッダー切り替え用のフラグを設定
         "user_name": request.session.get("user_name"),
     }
     if extra_context:
@@ -142,17 +144,14 @@ async def roll_call(request: Request):
         with engine.connect() as conn:
             sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
             rows = conn.execute(sql, {"tid": user_id}).fetchall()
-            classes_list = [{"class_id": c.class_id, "class_name": c.class_name} for c in rows]
+            # 修正: テンプレート側({{ course.id }}, {{ course.name }})に合わせてキー名を変更
+            classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
     except Exception as e:
         print(f"DB Error (Fetching classes): {e}")
 
-    # クラス名（"R4A1"）を渡す
-    # テンプレートへ渡す (修正版)
-    return templates.TemplateResponse("rollCall.html", {
-        "request": request,
-        "teacher_name": request.session.get('user_name', 'Teacher'),
-        "classes": classes_list
-    })
+    # 修正: render_pageを使用し、変数名を 'courses' にして渡す
+    return render_page(request, "rollCall.html", {"courses": classes_list})
+
 
 # 3. 生徒用: 出席登録画面 (register.html)
 @app.get("/register", response_class=HTMLResponse)
@@ -187,8 +186,11 @@ async def user_management(request: Request):
 # 8. パスワード変更画面 (passwordChange.html)
 @app.get("/passwordChange", response_class=HTMLResponse)
 async def password_change(request: Request):
-    # ログインしていなくても表示できる場合の例（要件による）
-    return templates.TemplateResponse("passwordChange.html", {"request": request})
+    # render_pageを使ってヘッダーを正しく表示させる（ログイン中の場合）
+    # ログインしていなくても表示したい場合はTemplateResponseのままでも良いが、
+    # 統一感のためにログインチェックを通すか、is_teacherを手動で渡す必要がある。
+    # ここでは簡易的にログイン済み前提として render_page を推奨。
+    return render_page(request, "passwordChange.html")
 
 
 # ==========================================
@@ -213,14 +215,15 @@ async def generate_otp(req: GenerateOTPRequest):
     
     try:
         with engine.connect() as conn:
+            # 修正: req.classe_id -> req.class_id
             result = conn.execute(sql, {
-                "cid": req.classe_id,
+                "cid": req.class_id,
                 "date": current_date,
                 "token": str(val)
             })
             conn.commit()
             new_id = result.fetchone()[0]
-            print(f"✅ Session Started: ID={new_id}, classeID={req.classe_id}, Token={val}")
+            print(f"✅ Session Started: ID={new_id}, classID={req.class_id}, Token={val}")
         
         return JSONResponse({"otp_binary": binary_str, "otp_display": val})
         
