@@ -132,22 +132,27 @@ async def roll_call(request: Request):
     if role != "teacher":
         return RedirectResponse(url="/", status_code=303)
 
-    classes_list = []
-    try:
-        with engine.connect() as conn:
-            sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
-            rows = conn.execute(sql, {"tid": user_id}).fetchall()
+
+# ==================================================================
+# クラス選択の名残(科目に変更　or 再利用の可能性があるためコメントアウト)
+# ===================================================================
+    # classes_list = []
+    # try:
+    #     with engine.connect() as conn:
+    #         sql = text("SELECT class_id, class_name FROM classes WHERE teacher_id = :tid")
+    #         rows = conn.execute(sql, {"tid": user_id}).fetchall()
             
-            # 【重要修正】
-            # HTML側が {{ class.id }}, {{ class.name }} を期待していると仮定し、キー名を id, name に設定。
-            # HTML側が {{ class.class_id }} の場合は "id" を "class_id" に書き換えてください。
-            classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
-    except Exception as e:
-        print(f"DB Error (Fetching classes): {e}")
+    #         # 【重要修正】
+    #         # HTML側が {{ class.id }}, {{ class.name }} を期待していると仮定し、キー名を id, name に設定。
+    #         # HTML側が {{ class.class_id }} の場合は "id" を "class_id" に書き換えてください。
+    #         classes_list = [{"id": c.class_id, "name": c.class_name} for c in rows]
+    # except Exception as e:
+    #     print(f"DB Error (Fetching classes): {e}")
 
-    # render_page を使い、キー名を "classes" にして渡す（HTMLのループ変数名に合わせる）
-    return render_page(request, "rollCall.html", {"classes": classes_list})
+    # # render_page を使い、キー名を "classes" にして渡す（HTMLのループ変数名に合わせる）
+    # return render_page(request, "rollCall.html", {"classes": classes_list})
 
+    return render_page(request, "rollCall.html")
 
 # 3. 生徒用: 出席登録画面 (register.html)
 @app.get("/register", response_class=HTMLResponse)

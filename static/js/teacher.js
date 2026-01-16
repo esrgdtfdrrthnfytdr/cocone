@@ -67,53 +67,57 @@ window.addEventListener('load', async () => {
     }
 });
 
-if (submitBtn) {
-    submitBtn.addEventListener('click', async () => {
-        if (isScanning) {
-            stopSound();
-            return;
-        }
 
-        // 科目が選択されているかチェック
-        const selectedValue = courseSelect ? courseSelect.value : null;
-        if (!selectedValue) {
-            if(errorMessage) {
-                errorMessage.textContent = '科目を選択してください';
-                errorMessage.classList.add('show');
-            }
-            return;
-        }
-        if(errorMessage) {
-            errorMessage.textContent = '';
-            errorMessage.classList.remove('show');
-        }
+// ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+// 科目情報がほしいならこれを再利用して
+// ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+// // if (submitBtn) {
+//     submitBtn.addEventListener('click', async () => {
+//         if (isScanning) {
+//             stopSound();
+//             return;
+//         }
 
-        if (audioCtx && audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-        }
+//         // 科目が選択されているかチェック
+//         const selectedValue = courseSelect ? courseSelect.value : null;
+//         if (!selectedValue) {
+//             if(errorMessage) {
+//                 errorMessage.textContent = '科目を選択してください';
+//                 errorMessage.classList.add('show');
+//             }
+//             return;
+//         }
+//         if(errorMessage) {
+//             errorMessage.textContent = '';
+//             errorMessage.classList.remove('show');
+//         }
 
-        try {
-            // APIへPOST送信 (course_id を含める)
-            const res = await fetch('/api/generate_otp', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ course_id: parseInt(selectedValue) })
-            });
+//         if (audioCtx && audioCtx.state === 'suspended') {
+//             await audioCtx.resume();
+//         }
+
+//         try {
+//             // APIへPOST送信 (course_id を含める)
+//             const res = await fetch('/api/generate_otp', { 
+//                 method: 'POST',
+//                 headers: { 'Content-Type': 'application/json' },
+//                 body: JSON.stringify({ course_id: parseInt(selectedValue) })
+//             });
             
-            if (!res.ok) {
-                throw new Error("Server Response Error");
-            }
+//             if (!res.ok) {
+//                 throw new Error("Server Response Error");
+//             }
 
-            const data = await res.json();
+//             const data = await res.json();
             
-            startScanningUI();
-            playMixedSoundLoop(data.otp_binary);
-        } catch(e) {
-            console.error(e);
-            alert("通信エラーが発生しました");
-        }
-    });
-}
+//             startScanningUI();
+//             playMixedSoundLoop(data.otp_binary);
+//         } catch(e) {
+//             console.error(e);
+//             alert("通信エラーが発生しました");
+//         }
+//     });
+// }
 
 function startScanningUI() {
     isScanning = true;
