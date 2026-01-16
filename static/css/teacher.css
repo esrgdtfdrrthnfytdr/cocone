@@ -95,3 +95,13 @@ select {
         width: 220px;
     }
 }
+
+/* セレクトボックスのコンテナ全体を非表示にする（余白ごと消す） */
+.form-container {
+    display: none;
+}
+
+/* 念のため、出席確認ボタンの位置バランスを調整（必要に応じて数値を変更してください） */
+#submit-btn {
+    margin-top: 50px;
+}
