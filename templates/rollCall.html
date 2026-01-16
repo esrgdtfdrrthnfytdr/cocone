@@ -45,11 +45,11 @@
     <main>
         <h1>出席確認</h1>
         <div class="form-container">
-            <label for="course-select">対象科目の選択</label>
+            <label for="course-select">対象クラスの選択</label>
             <div class="select-wrapper">
                 <select id="course-select">
                     <option value="" disabled selected>クラスを選択してください</option>
-                    {% for course in courses %}
+                    {% for class in classes %}
                         <option value="{{ class.id }}">{{ class.name }}</option>
                     {% endfor %}
                 </select>
