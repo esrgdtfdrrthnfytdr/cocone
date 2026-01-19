@@ -1,84 +1,208 @@
-document.addEventListener('DOMContentLoaded', function() {
-    
-    // HTMLのIDに合わせて要素を取得
-    const submitBtn = document.getElementById('submit-btn');
-    const statusArea = document.getElementById('status-area');
-    
-    // 状態管理
-    let isRunning = false;
+let audioCtx;
+let bgmBuffer = null;
+let bgmSource = null;
+let bgmGainNode = null;
+let osc = null;
+let isScanning = false;
+let nextSignalTimer = null;
+let isBgmOn = true;
 
-    // --- コマ自動判定ロジック ---
-    function getCurrentPeriod() {
-        const now = new Date();
-        const totalMinutes = now.getHours() * 60 + now.getMinutes();
+// 設定
+const BGM_URL = '/static/sounds/bgm.wav'; 
 
-        // 1コマ目: 09:15(555) ~ 10:45(645)
-        if (totalMinutes >= 555 && totalMinutes <= 645) return 1;
-        // 2コマ目: 11:00(660) ~ 12:30(750)
-        if (totalMinutes >= 660 && totalMinutes <= 750) return 2;
-        // 3コマ目: 13:30(810) ~ 15:00(900)
-        if (totalMinutes >= 810 && totalMinutes <= 900) return 3;
-        // 4コマ目: 15:15(915) ~ 16:45(1005)
-        if (totalMinutes >= 915 && totalMinutes <= 1005) return 4;
+// 周波数設定
+const FREQ_START = 19000; 
+const FREQ_1 = 18000;     
+const FREQ_0 = 17000;     
 
-        return null; 
-    }
+const BIT_DURATION = 1.0;
+const LOOP_GAP_SEC = 2.0;
+const BGM_VOLUME = 0.4;
 
-    if (submitBtn) {
-        submitBtn.addEventListener('click', async function() {
-            
-            // 既に実行中ならリロードしてリセット（簡易的な終了処理）
-            if (isRunning) {
-                location.reload();
-                return;
-            }
+// UI要素 (class-select ではなく course-select に変更)
+const submitBtn = document.getElementById('submit-btn');
+const courseSelect = document.getElementById('course-select');
+const errorMessage = document.getElementById('error-message');
+const volSlider = document.getElementById('signal-volume');
+const volDisplay = document.getElementById('vol-display');
+const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
 
-            // 時刻からコマを判定
-            const autoPeriod = getCurrentPeriod();
+// スライダーの表示更新
+if (volSlider && volDisplay) {
+    volSlider.addEventListener('input', (e) => {
+        volDisplay.textContent = e.target.value;
+    });
+}
 
-            // 時間外のチェック
-            // ※動作確認のために制限を外したい場合は、このif文をコメントアウトしてください
-            if (!autoPeriod) {
-                alert("現在は授業時間外のため、自動判定できませんでした。");
-                return;
-            }
+// BGM切り替えボタン
+if (bgmToggleBtn) {
+    bgmToggleBtn.addEventListener('click', () => {
+        isBgmOn = !isBgmOn;
+        if (isBgmOn) {
+            bgmToggleBtn.textContent = "🎵 BGM: ON";
+            bgmToggleBtn.style.backgroundColor = "#63D2B0";
+            bgmToggleBtn.style.opacity = "1";
+        } else {
+            bgmToggleBtn.textContent = "🔇 BGM: OFF";
+            bgmToggleBtn.style.backgroundColor = "#95A5A6";
+        }
+        if (bgmGainNode) {
+            bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
+        }
+    });
+}
 
-            try {
-                if(statusArea) statusArea.textContent = "接続中...";
-                
-                // サーバーへ送信 (class_idは送らない)
-                const response = await fetch('/api/generate_otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        period: autoPeriod 
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    isRunning = true;
-                    submitBtn.textContent = "終了";
-                    submitBtn.style.backgroundColor = "#E57373"; // 終了時は赤っぽく
-                    
-                    if(statusArea) {
-                        statusArea.innerHTML = `
-                            授業中 (${autoPeriod}コマ目)<br>
-                            OTP: <span style="font-size:1.5em; font-weight:bold;">${data.otp_display}</span>
-                        `;
-                    }
-
-                } else {
-                    alert("開始に失敗しました");
-                    if(statusArea) statusArea.textContent = "エラー";
-                }
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert("通信エラー");
-                if(statusArea) statusArea.textContent = "通信エラー";
-            }
-        });
+// BGM読み込み
+window.addEventListener('load', async () => {
+    try {
+        window.AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        
+        const response = await fetch(BGM_URL);
+        const arrayBuffer = await response.arrayBuffer();
+        bgmBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        console.log("BGM Ready");
+    } catch (e) {
+        console.error("BGM Load Error:", e);
     }
 });
+
+
+
+if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+        if (isScanning) {
+            stopSound();
+            return;
+        }
+
+//         // 科目が選択されているかチェック
+//         const selectedValue = courseSelect ? courseSelect.value : null;
+//         if (!selectedValue) {
+//             if(errorMessage) {
+//                 errorMessage.textContent = '科目を選択してください';
+//                 errorMessage.classList.add('show');
+//             }
+//             return;
+//         }
+
+        if(errorMessage) {
+            errorMessage.textContent = '';
+            errorMessage.classList.remove('show');
+        }
+
+        if (audioCtx && audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+        try {
+            // APIへPOST送信 (course_id を含める)
+            const res = await fetch('/api/generate_otp', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})  //空データ
+                // body: JSON.stringify({ course_id: parseInt(selectedValue) })コースID
+            });
+            
+            if (!res.ok) {
+                throw new Error("Server Response Error");
+            }
+
+            const data = await res.json();
+            
+            startScanningUI();
+            playMixedSoundLoop(data.otp_binary);
+        } catch(e) {
+            console.error(e);
+            alert("通信エラーが発生しました");
+        }
+    });
+}
+
+function startScanningUI() {
+    isScanning = true;
+    submitBtn.textContent = '停止する';
+    submitBtn.classList.add('is-processing');
+    if(courseSelect) courseSelect.disabled = true;
+}
+
+function stopScanningUI() {
+    isScanning = false;
+    submitBtn.textContent = '出席確認';
+    submitBtn.classList.remove('is-processing');
+    if(courseSelect) courseSelect.disabled = false;
+}
+
+function playMixedSoundLoop(binaryStr) {
+    if (!bgmBuffer) return;
+
+    bgmSource = audioCtx.createBufferSource();
+    bgmSource.buffer = bgmBuffer;
+    bgmSource.loop = true;
+    
+    bgmGainNode = audioCtx.createGain();
+    bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
+    
+    bgmSource.connect(bgmGainNode);
+    bgmGainNode.connect(audioCtx.destination);
+    bgmSource.start(0);
+
+    playSignalRecursive(binaryStr);
+}
+
+function playSignalRecursive(binaryStr) {
+    if (!isScanning) return;
+
+    osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    
+    const currentVol = volSlider ? parseFloat(volSlider.value) : 0.1;
+    oscGain.gain.value = currentVol; 
+    
+    osc.connect(oscGain);
+    oscGain.connect(audioCtx.destination);
+
+    const startTime = audioCtx.currentTime;
+
+
+
+    osc.frequency.setValueAtTime(FREQ_START, startTime);
+    for (let i = 0; i < binaryStr.length; i++) {
+        const bit = binaryStr[i];
+        const time = startTime + BIT_DURATION + (i * BIT_DURATION);
+        osc.frequency.setValueAtTime((bit === '1' ? FREQ_1 : FREQ_0), time);
+    }
+
+
+    const totalDuration = BIT_DURATION + (binaryStr.length * BIT_DURATION);
+    const endTime = startTime + totalDuration;
+
+
+
+    osc.start(startTime);
+    osc.stop(endTime);
+    
+    osc.onended = () => {
+        osc = null;
+        if (isScanning) {
+            nextSignalTimer = setTimeout(() => {
+                playSignalRecursive(binaryStr);
+            }, LOOP_GAP_SEC * 1000);
+        }
+    };
+}
+
+function stopSound() {
+    isScanning = false;
+    if (nextSignalTimer) {
+        clearTimeout(nextSignalTimer);
+        nextSignalTimer = null;
+
+
+
+    }
+    if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
+    if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
+    
+    bgmGainNode = null;
+    stopScanningUI();
+}
