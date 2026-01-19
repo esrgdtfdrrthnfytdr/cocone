@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     
-    // 戻るボタン (画面左下)
+    // --- 戻るボタン ---
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
         backBtn.addEventListener('click', function() {
@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ダウンロードボタン
+    // --- ダウンロードボタン ---
     const downloadBtn = document.getElementById('download-btn');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', function() {
@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalSelect = document.getElementById('modal-status-select');
 
     let currentTargetElement = null;
+    let currentRawDate = ""; // API送信用に日付文字列を保持
 
     // ステータスセルクリックイベント
     const statusCells = document.querySelectorAll('.status');
@@ -53,12 +54,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const headerRow = document.querySelector('.result-table thead tr');
             const targetHeader = headerRow ? headerRow.children[tdIndex] : null;
             
-            // 日付フォーマット調整 (2025-11-25 -> 11月25日)
-            let dateText = targetHeader ? targetHeader.textContent : '';
+            // 生の日付文字列 (YYYY-MM-DD) を保持
+            currentRawDate = targetHeader ? targetHeader.textContent.trim() : '';
+
+            // 表示用にフォーマット (M月D日)
+            let dateDisplay = currentRawDate;
             try {
-                const d = new Date(dateText);
+                const d = new Date(currentRawDate);
                 if (!isNaN(d.getTime())) {
-                    dateText = `${d.getMonth() + 1}月${d.getDate()}日`;
+                    dateDisplay = `${d.getMonth() + 1}月${d.getDate()}日`;
                 }
             } catch(e) {}
 
@@ -69,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // モーダルにセット
             if (modalStudentNum) modalStudentNum.textContent = studentId;
             if (modalStudentName) modalStudentName.textContent = studentName;
-            if (modalDate) modalDate.textContent = dateText;
+            if (modalDate) modalDate.textContent = dateDisplay;
             if (modalPeriod) modalPeriod.textContent = periodText;
 
             // ステータス選択の初期値
@@ -106,20 +110,57 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 変更ボタン
+    // ▼▼▼ 変更ボタンクリック時の処理 (API送信) ▼▼▼
     if (modalSaveBtn && modal) {
-        modalSaveBtn.addEventListener('click', function() {
+        modalSaveBtn.addEventListener('click', async function() {
             if (currentTargetElement && modalSelect) {
                 const selectedValue = modalSelect.value;
                 const selectedText = modalSelect.options[modalSelect.selectedIndex].text;
+                
+                // URLパラメータからクラス名を取得
+                const urlParams = new URLSearchParams(window.location.search);
+                const className = urlParams.get('class_name');
+                const studentNumber = modalStudentNum.textContent; 
+                // "1コマ目" -> "1" に変換
+                const periodStr = modalPeriod.textContent.replace('コマ目', '');
+                const period = parseInt(periodStr) || 1;
 
-                // 画面更新
-                currentTargetElement.className = 'status'; 
-                currentTargetElement.classList.add(selectedValue);
-                currentTargetElement.textContent = selectedText;
+                if (!className) {
+                    alert("クラス情報がURLから取得できませんでした。");
+                    return;
+                }
 
-                console.log('Updated:', selectedText);
-                closeModal();
+                try {
+                    // APIへ送信
+                    const response = await fetch('/api/update_status', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            class_name: className,
+                            student_number: studentNumber,
+                            date: currentRawDate,
+                            period: period,
+                            status: selectedText,
+                            note: "手動変更"
+                        })
+                    });
+
+                    if (response.ok) {
+                        // 成功したら画面も更新
+                        currentTargetElement.className = 'status'; 
+                        currentTargetElement.classList.add(selectedValue);
+                        currentTargetElement.textContent = selectedText;
+                        
+                        console.log('Update success');
+                        closeModal();
+                    } else {
+                        const err = await response.json();
+                        alert("保存に失敗しました: " + (err.message || "不明なエラー"));
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("通信エラーが発生しました");
+                }
             }
         });
     }
