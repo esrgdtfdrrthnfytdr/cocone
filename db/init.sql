@@ -30,6 +30,7 @@ CREATE TABLE classes (
 );
 
 -- ▼ 生徒マスタ
+-- 1. 生徒テーブル（既存のまま）
 CREATE TABLE students (
     student_number TEXT PRIMARY KEY,
     email TEXT NOT NULL,
@@ -39,6 +40,7 @@ CREATE TABLE students (
     attendance_no INT
 );
 
+-- 2. 授業セッションテーブル（授業の「1コマ」を管理）
 -- 日付や時限、どのクラスの授業かなどを記録します
 CREATE TABLE class_sessions (
     session_id SERIAL PRIMARY KEY,
@@ -48,31 +50,13 @@ CREATE TABLE class_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 3. 出席結果テーブル（「誰が」「どの授業に」「どうだったか」を記録）
 CREATE TABLE attendance_results (
     result_id SERIAL PRIMARY KEY,
     session_id INT REFERENCES class_sessions(session_id),    -- どの授業回か
     student_number TEXT REFERENCES students(student_number), -- どの生徒か
     status TEXT NOT NULL,          -- '出席', '欠席', '遅刻' など
     note TEXT,                     -- 備考 (例: '電車遅延')
-    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ▼ 出席セッション (授業 -> クラスの集まりに変更)
-CREATE TABLE class_sessions (
-    session_id SERIAL PRIMARY KEY,
-    class_id INT REFERENCES classes(class_id), -- 科目IDではなくクラスID
-    date TEXT,
-    sound_token TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ▼ 出席結果 (変更なし + 登録日時)
-CREATE TABLE attendance_results (
-    result_id SERIAL PRIMARY KEY,
-    session_id INT REFERENCES class_sessions(session_id),
-    student_number TEXT REFERENCES students(student_number),
-    status TEXT, -- 出席, 欠席, 遅刻, 公欠 など
-    note TEXT,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
