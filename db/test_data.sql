@@ -14,6 +14,9 @@ INSERT INTO classes (class_name, teacher_id) VALUES
 
 -- --- Students ---
 INSERT INTO students (student_number, email, password_hash, name, homeroom_class, attendance_no) VALUES
+('s9999999', 'student@hcs.ac.jp', 'pass', '円形歩道', 'R4A1', 99);
+
+INSERT INTO students (student_number, email, password_hash, name, homeroom_class, attendance_no) VALUES
 ('s2025101', 's2025101@hcs.ac.jp', 'pass', '山本大樹_1', 'R4A1', 1),
 ('s2025102', 's2025102@hcs.ac.jp', 'pass', '山本陽菜_2', 'R4A1', 2),
 ('s2025103', 's2025103@hcs.ac.jp', 'pass', '田中陸_3', 'R4A1', 3),
