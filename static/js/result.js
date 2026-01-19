@@ -8,11 +8,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- ダウンロードボタン ---
+    // --- ダウンロードボタン (CSVダウンロード実装) ---
     const downloadBtn = document.getElementById('download-btn');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', function() {
-            alert('CSVダウンロード機能は未実装です');
+            // URLパラメータから現在の検索条件を取得
+            const urlParams = new URLSearchParams(window.location.search);
+            const className = urlParams.get('class_name');
+            const startDate = urlParams.get('start_date');
+            const endDate = urlParams.get('end_date');
+
+            if (!className || !startDate || !endDate) {
+                alert("検索条件が見つかりません。");
+                return;
+            }
+
+            // APIへリダイレクトしてダウンロードを開始
+            // encodeURIComponentで日本語クラス名などを安全に送信
+            const url = `/api/download_csv?class_name=${encodeURIComponent(className)}&start_date=${startDate}&end_date=${endDate}`;
+            window.location.href = url;
         });
     }
 
@@ -31,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentTargetElement = null;
     let currentRawDate = ""; 
     
-    // ▼▼▼ 追加: 本当の学籍番号を保持する変数 ▼▼▼
+    // 本当の学籍番号を保持する変数
     let currentRealStudentId = ""; 
 
     // ステータスセルクリックイベント
@@ -42,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const row = cell.closest('tr');
             
-            // ▼▼▼ 修正: 行(tr)から data-real-id を取得 ▼▼▼
+            // 行(tr)から data-real-id を取得
             currentRealStudentId = row.dataset.realId; 
 
             // 表示用の出席番号
@@ -75,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const rawPeriod = cell.dataset.period || '1';
             const periodText = rawPeriod + 'コマ目';
 
-            // モーダルにセット (表示は出席番号のまま)
+            // モーダルにセット
             if (modalStudentNum) modalStudentNum.textContent = studentIdDisplay;
             if (modalStudentName) modalStudentName.textContent = studentName;
             if (modalDate) modalDate.textContent = dateDisplay;
@@ -141,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             class_name: className,
-                            student_number: currentRealStudentId, // ▼▼▼ 修正: ここで本当のIDを送信 ▼▼▼
+                            student_number: currentRealStudentId,
                             date: currentRawDate,
                             period: period,
                             status: selectedText,

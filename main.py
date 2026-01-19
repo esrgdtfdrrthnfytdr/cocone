@@ -5,9 +5,11 @@ import datetime
 from datetime import timedelta
 from typing import Optional
 from collections import defaultdict
+import csv
+import io
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, text
@@ -167,10 +169,9 @@ async def attendance_result(request: Request, class_name: Optional[str]=None, st
                 for r in results_rows:
                     attendance_map[(r.student_number, r.session_id)] = r.status
 
-            # ▼▼▼ 修正点: 日付キーを文字列に統一 ▼▼▼
+            # 日付キーを文字列に統一
             sessions_by_date = defaultdict(dict)
             for row in sessions_rows:
-                # DBから来たdate型を文字列に変換してから辞書のキーにする
                 d_str = row.date.strftime('%Y-%m-%d') if isinstance(row.date, datetime.date) else str(row.date)
                 p = row.period if row.period else 1
                 sessions_by_date[d_str][p] = row.session_id
@@ -185,7 +186,6 @@ async def attendance_result(request: Request, class_name: Optional[str]=None, st
                 }
                 for d in date_headers:
                     day_statuses = []
-                    # ここで文字列キー 'd' を使って辞書から引く
                     day_session_map = sessions_by_date.get(d, {})
                     
                     for i in range(1, 5):
@@ -230,7 +230,6 @@ async def generate_otp(req: GenerateOTPRequest):
     current_date = datetime.date.today().strftime('%Y-%m-%d')
     cid_val = int(req.class_id) if req.class_id and str(req.class_id).strip() else None
 
-    # ▼ 修正: with engine.begin() で自動コミット
     try:
         with engine.begin() as conn:
             new_id = conn.execute(
@@ -267,7 +266,6 @@ async def check_attend(req: CheckAttendRequest, request: Request):
 @app.post("/api/update_status")
 async def update_status(req: UpdateStatusRequest):
     try:
-        # ▼ 修正: engine.begin() でトランザクションを確実に実行
         with engine.begin() as conn:
             c_row = conn.execute(text("SELECT class_id FROM classes WHERE class_name = :name"), {"name": req.class_name}).fetchone()
             if not c_row: return JSONResponse({"status": "error", "message": "クラス不明"}, status_code=404)
@@ -302,10 +300,86 @@ async def update_status(req: UpdateStatusRequest):
                     {"sid": session_id, "stu": req.student_number, "st": req.status, "nt": req.note}
                 )
             
-            # engine.begin() ブロックを抜けると自動でcommitされます
             print(f"✅ Updated: {req.student_number} -> {req.status} (Date: {req.date})")
             return JSONResponse({"status": "success", "message": "更新しました"})
 
     except Exception as e:
         print(f"❌ Update Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+# ▼▼▼ 追加: CSVダウンロードAPI ▼▼▼
+@app.get("/api/download_csv")
+async def download_csv(class_name: str, start_date: str, end_date: str):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['日付', '時限', 'クラス', '出席番号', '学籍番号', '氏名', '状態', '備考'])
+
+    try:
+        s_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+        e_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+        delta = e_date - s_date
+        date_list = [(s_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(delta.days + 1)]
+
+        with engine.connect() as conn:
+            # 1. 生徒
+            sql_students = text("SELECT student_number, name, attendance_no FROM students WHERE homeroom_class = :c_name ORDER BY attendance_no")
+            students = conn.execute(sql_students, {"c_name": class_name}).fetchall()
+
+            # 2. セッション
+            sql_sessions = text("""
+                SELECT s.session_id, s.date, s.period
+                FROM class_sessions s
+                JOIN attendance_results ar ON s.session_id = ar.session_id
+                JOIN students stu ON ar.student_number = stu.student_number
+                WHERE stu.homeroom_class = :c_name 
+                  AND s.date >= :start 
+                  AND s.date <= :end
+            """)
+            sessions = conn.execute(sql_sessions, {"c_name": class_name, "start": start_date, "end": end_date}).fetchall()
+            
+            session_map = defaultdict(dict)
+            for s in sessions:
+                d_str = s.date.strftime('%Y-%m-%d') if isinstance(s.date, datetime.date) else str(s.date)
+                session_map[d_str][s.period] = s.session_id
+
+            # 3. 結果
+            res_map = {}
+            if sessions:
+                s_ids = [s.session_id for s in sessions]
+                bind_params = {f"id{i}": sid for i, sid in enumerate(s_ids)}
+                bind_keys = ", ".join([f":{k}" for k in bind_params.keys()])
+                sql_res = text(f"SELECT student_number, session_id, status, note FROM attendance_results WHERE session_id IN ({bind_keys})")
+                results = conn.execute(sql_res, bind_params).fetchall()
+                for r in results:
+                    res_map[(r.student_number, r.session_id)] = (r.status, r.note)
+
+            # CSV行生成
+            for d_str in date_list:
+                for period in range(1, 5):
+                    sess_id = session_map.get(d_str, {}).get(period)
+                    
+                    for stu in students:
+                        status = "データなし"
+                        note = ""
+                        if sess_id:
+                            val = res_map.get((stu.student_number, sess_id))
+                            if val:
+                                status, note = val
+                        
+                        writer.writerow([
+                            d_str, period, class_name,
+                            stu.attendance_no, stu.student_number, stu.name,
+                            status, note or ""
+                        ])
+
+    except Exception as e:
+        print(f"CSV Gen Error: {e}")
+        writer.writerow(["Error", str(e)])
+
+    output.seek(0)
+    # Excelで文字化けしないようBOM付きUTF-8
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode('utf-8-sig')),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=attendance_{class_name}_{start_date}.csv"}
+    )
