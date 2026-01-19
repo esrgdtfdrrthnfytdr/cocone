@@ -35,7 +35,9 @@
                     {% for student in students_data %}
                     <tr>
                         <td class="fixed-col student-id">{{ student.number }}</td>
-                        <td class="fixed-col name-col student-name">{{ student.name }}</td>                        
+                        
+                        <td class="fixed-col name-col student-name">{{ student.name }}</td>
+                        
                         {% for date in date_headers %}
                         <td>
                             <div class="cell-stack">
@@ -46,7 +48,7 @@
                                         </span>
                                     {% endfor %}
                                 {% else %}
-                                    <span class="status no-data">-</span>
+                                    <span class="status no-data">データなし</span>
                                 {% endif %}
                             </div>
                         </td>
@@ -59,13 +61,32 @@
     </div>
     
     <button id="back-btn" class="back-btn">戻る</button>
-    {% include "parts/_status_modal.html" ignore missing %}
+
     <div id="change-status-modal" class="modal-overlay">
         <div class="modal-content change-modal-content">
             <h2>出欠席状態の変更</h2>
-             <div class="modal-btn-area">
-                <button id="modal-cancel-btn" class="modal-btn cancel-btn">戻る</button>
-                <button id="modal-save-btn" class="modal-btn save-btn">変更</button>
+            <div class="modal-info">
+                <p><strong>氏名:</strong> <span id="modal-student-name"></span> (<span id="modal-student-id"></span>)</p>
+                <p><strong>日付:</strong> <span id="modal-date"></span></p>
+                <p><strong>時限:</strong> <span id="modal-period"></span></p>
+            </div>
+            
+            <div class="status-select-area">
+                <label for="modal-status-select">状態:</label>
+                <select id="modal-status-select">
+                    <option value="attend">出席</option>
+                    <option value="absent">欠席</option>
+                    <option value="late">遅刻</option>
+                    <option value="early">早退</option>
+                    <option value="public-abs">公欠</option>
+                    <option value="special-abs">特欠</option>
+                    <option value="no-data">データなし</option>
+                </select>
+            </div>
+
+            <div class="modal-btn-area">
+                <button id="modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
+                <button id="modal-save-btn" class="modal-btn save-btn">保存</button>
             </div>
         </div>
     </div>

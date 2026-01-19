@@ -39,6 +39,24 @@ CREATE TABLE students (
     attendance_no INT
 );
 
+-- 日付や時限、どのクラスの授業かなどを記録します
+CREATE TABLE class_sessions (
+    session_id SERIAL PRIMARY KEY,
+    class_name TEXT NOT NULL,      -- クラス名 (students.homeroom_classと対応)
+    date DATE NOT NULL,            -- 授業日 (例: 2025-11-16)
+    period INT,                    -- 何コマ目か (例: 1)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE attendance_results (
+    result_id SERIAL PRIMARY KEY,
+    session_id INT REFERENCES class_sessions(session_id),    -- どの授業回か
+    student_number TEXT REFERENCES students(student_number), -- どの生徒か
+    status TEXT NOT NULL,          -- '出席', '欠席', '遅刻' など
+    note TEXT,                     -- 備考 (例: '電車遅延')
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ▼ 出席セッション (授業 -> クラスの集まりに変更)
 CREATE TABLE class_sessions (
     session_id SERIAL PRIMARY KEY,
