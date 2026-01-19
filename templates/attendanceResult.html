@@ -63,26 +63,30 @@
 
     <div id="change-status-modal" class="modal-overlay">
         <div class="modal-window">
-            <div class="modal-header">
-                <h2>出欠席状態変更</h2>
-                <button id="modal-close-btn" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
+            <h2 class="modal-title">出欠席状態の変更</h2>
+            
+            <div class="modal-content-grid">
                 <div class="info-row">
-                    <span class="info-label">対象学生</span>
+                    <span class="info-label">出席番号</span>
+                    <span id="modal-student-number" class="info-value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">氏名</span>
                     <span id="modal-student-name" class="info-value"></span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">対象日付</span>
+                    <span class="info-label">変更日</span>
                     <span id="modal-date" class="info-value"></span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">対象時限</span>
+                    <span class="info-label">変更コマ</span>
                     <span id="modal-period" class="info-value"></span>
                 </div>
-                
-                <div class="form-group">
-                    <label for="modal-status-select">状態</label>
+            </div>
+
+            <div class="select-area">
+                <p class="select-label">出欠席状態の選択</p>
+                <div class="custom-select-wrapper">
                     <select id="modal-status-select">
                         <option value="attend">出席</option>
                         <option value="absent">欠席</option>
@@ -93,14 +97,11 @@
                         <option value="no-data">データなし</option>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label for="modal-note">備考</label>
-                    <textarea id="modal-note" rows="3"></textarea>
-                </div>
             </div>
-            <div class="modal-footer">
-                <button id="modal-save-btn" class="save-btn">保存する</button>
+
+            <div class="modal-buttons">
+                <button id="modal-close-btn" class="modal-btn btn-back">戻る</button>
+                <button id="modal-save-btn" class="modal-btn btn-change">変更</button>
             </div>
         </div>
     </div>
