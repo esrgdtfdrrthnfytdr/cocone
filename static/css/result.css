@@ -1,7 +1,4 @@
-/* =========================================
-   基本レイアウト・テーブルスタイル (復元版)
-   ========================================= */
-
+/* ベースレイアウト */
 .result-container {
     background-color: #fff;
     padding: 20px;
@@ -14,7 +11,6 @@ h1 {
     font-size: 1.5rem;
     margin-bottom: 20px;
     color: #333;
-    text-align: center;
 }
 
 /* アクションバー */
@@ -25,163 +21,135 @@ h1 {
 }
 
 .download-btn {
-    background-color: #2c3e50; /* 濃い色に変更 */
+    background-color: #28a745;
     color: white;
     border: none;
-    padding: 8px 20px;
+    padding: 8px 16px;
     border-radius: 4px;
     cursor: pointer;
-    font-weight: bold;
+    font-size: 0.9rem;
 }
 .download-btn:hover {
-    background-color: #1a252f;
+    background-color: #218838;
 }
 
-/* テーブル全体 */
+/* テーブルスタイル */
 .table-wrapper {
     overflow-x: auto;
-    border: 1px solid #ccc;
+    max-width: 100%;
+    border: 1px solid #ddd;
 }
 
 .result-table {
     width: 100%;
     border-collapse: collapse;
     white-space: nowrap;
-    font-size: 0.95rem;
 }
 
 .result-table th, .result-table td {
-    border: 1px solid #bbb; /* 枠線を少し濃く */
-    padding: 6px;
+    border: 1px solid #ddd;
+    padding: 8px;
     text-align: center;
     vertical-align: middle;
 }
 
-/* ヘッダー */
 .result-table th {
-    background-color: #e0e0e0; /* 少し濃いグレー */
+    background-color: #f8f9fa;
     font-weight: bold;
-    color: #333;
-    height: 40px;
+    color: #555;
+    min-width: 80px;
 }
 
 /* 固定列 */
 .fixed-col {
     position: sticky;
     left: 0;
-    background-color: #e0e0e0; /* ヘッダーと同じ背景 */
+    background-color: #fff;
     z-index: 10;
-    border-right: 2px solid #999; /* 固定列の境目を強調 */
 }
-.result-table td.fixed-col {
-    background-color: #f9f9f9; /* データ行の固定列は白っぽく */
+.result-table th.fixed-col {
+    background-color: #f8f9fa;
+    z-index: 20;
 }
 
-/* 名前列の位置調整 */
 .name-col {
-    left: 70px; /* 出席番号の幅分ずらす */
+    left: 60px; /* 出席番号列の幅に合わせて調整 */
     min-width: 120px;
     text-align: left;
-    padding-left: 10px;
 }
 .student-id {
-    min-width: 70px;
+    min-width: 60px;
 }
 
-/* セル内の積み上げ */
+/* セル内の積み上げ表示 */
 .cell-stack {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    min-width: 80px;
+    gap: 2px;
 }
 
-/* --- ステータスバッジ (画像に合わせてソリッドカラーに変更) --- */
 .status {
     display: block;
-    padding: 4px 2px;
-    font-size: 0.85rem;
-    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.8rem;
+    border-radius: 3px;
     cursor: pointer;
-    color: #fff; /* 文字色は白 */
-    text-align: center;
+    background-color: #eee;
+    color: #333;
     transition: opacity 0.2s;
-    font-weight: normal;
 }
-
 .status:hover {
-    opacity: 0.85;
+    opacity: 0.8;
 }
 
-/* 各状態の色設定 (画像の配色を再現) */
-.attend {
-    background-color: #48bca3; /* 濃いティールグリーン */
-}
-.absent {
-    background-color: #e74c3c; /* 赤 */
-}
-.late {
-    background-color: #f39c12; /* オレンジ */
-}
-.early {
-    background-color: #e67e22; /* 濃いオレンジ */
-}
-.public-abs {
-    background-color: #d4ac0d; /* マスタードイエロー (画像参考) */
-}
-.special-abs {
-    background-color: #8e44ad; /* 紫 (画像参考) */
-}
-.no-data {
-    background-color: #7f8c8d; /* 濃いグレー (画像image_b4a7af.png参考) */
-    color: #fff;
-}
+/* ステータス別の色 */
+.attend { background-color: #d4edda; color: #155724; }
+.absent { background-color: #f8d7da; color: #721c24; }
+.late { background-color: #fff3cd; color: #856404; }
+.early { background-color: #ffeeba; color: #856404; }
+.public-abs { background-color: #cce5ff; color: #004085; }
+.special-abs { background-color: #e2e3e5; color: #383d41; }
+.no-data { background-color: #f0f0f0; color: #999; }
 
 /* 戻るボタン */
 .back-btn {
-    background-color: #7f8c8d;
+    background-color: #6c757d;
     color: white;
     border: none;
-    padding: 10px 30px;
-    border-radius: 30px;
+    padding: 10px 20px;
+    border-radius: 4px;
     cursor: pointer;
+    font-size: 1rem;
     margin-top: 20px;
-    font-weight: bold;
-    box-shadow: 0 4px 0 #5f6a6a;
 }
-.back-btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 #5f6a6a;
+.back-btn:hover {
+    background-color: #5a6268;
 }
 
-
-/* =========================================
-   モーダルウィンドウ (忠実再現スタイル)
-   ※ここは変更せず維持
-   ========================================= */
-
+/* 背景のオーバーレイ */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.4);
-    display: none;
+    background-color: rgba(0, 0, 0, 0.4); /* 暗い背景 */
+    display: none; /* 初期非表示 */
     justify-content: center;
     align-items: center;
-    z-index: 9999;
+    z-index: 9999; /* 最前面 */
 }
 
 .modal-overlay.active {
     display: flex;
 }
 
+/* ウィンドウ本体 */
 .custom-modal-window {
     width: 500px;
     max-width: 90%;
-    background-color: #ffffff;
-    border-radius: 10px;
+    background-color: #ffffff; /* 白背景を強制 */
+    border-radius: 10px;       /* 角丸 */
     padding: 30px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     font-family: sans-serif;
@@ -192,6 +160,7 @@ h1 {
     box-sizing: border-box;
 }
 
+/* タイトル "出欠席状態の変更" */
 .custom-modal-title {
     font-size: 1.5rem;
     font-weight: bold;
@@ -199,17 +168,18 @@ h1 {
     color: #000;
 }
 
+/* 情報グリッド (出席番号、氏名など) */
 .custom-info-grid {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 15px; /* 行間 */
     margin-bottom: 30px;
 }
 
 .custom-row {
     display: flex;
-    justify-content: center;
+    justify-content: center; /* 中央寄せ */
     align-items: center;
     width: 100%;
 }
@@ -219,16 +189,17 @@ h1 {
     text-align: right;
     font-weight: bold;
     font-size: 1rem;
-    margin-right: 30px;
+    margin-right: 30px; /* ラベルと値の間隔 */
 }
 
 .custom-value {
     width: 150px;
     text-align: left;
     font-weight: bold;
-    font-size: 1.4rem;
+    font-size: 1.4rem; /* 値は大きく */
 }
 
+/* セレクトボックスエリア */
 .custom-select-area {
     margin-bottom: 30px;
     text-align: center;
@@ -252,7 +223,7 @@ h1 {
     width: 100%;
     padding: 10px;
     font-size: 1.2rem;
-    border: 2px solid #333;
+    border: 2px solid #333; /* 太い黒枠 */
     border-radius: 5px;
     background-color: #fff;
     font-weight: bold;
@@ -262,6 +233,7 @@ h1 {
     appearance: none;
 }
 
+/* 擬似要素でV矢印を作る */
 .custom-select-wrapper::after {
     content: "V";
     position: absolute;
@@ -275,6 +247,7 @@ h1 {
     font-size: 0.8rem;
 }
 
+/* ボタンエリア */
 .custom-modal-buttons {
     display: flex;
     gap: 20px;
@@ -282,15 +255,17 @@ h1 {
     width: 100%;
 }
 
+/* ボタン共通スタイル */
 .custom-btn {
     width: 160px;
     height: 50px;
-    border-radius: 25px;
-    border: 2px solid #333;
+    border-radius: 25px; /* 完全な丸み（ピル型） */
+    border: 2px solid #333; /* 太い黒枠 */
     font-size: 1.2rem;
     font-weight: bold;
     color: #fff;
     cursor: pointer;
+    /* 立体的な影 */
     box-shadow: 0 4px 0 #333;
     transition: transform 0.1s, box-shadow 0.1s;
 }
@@ -300,10 +275,15 @@ h1 {
     box-shadow: 0 2px 0 #333;
 }
 
+/* 戻るボタン (グレー) */
 .btn-gray {
+    background-color: #95a5a6; /* グレー */
+    /* グラデーションで立体感を出す場合 */
     background: linear-gradient(to bottom, #aab7b8, #95a5a6);
 }
 
+/* 変更ボタン (緑/ティール) */
 .btn-green {
+    background-color: #63d2b0; /* 指定画像に近い色 */
     background: linear-gradient(to bottom, #7ee0c4, #63d2b0);
 }
