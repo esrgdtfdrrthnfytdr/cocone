@@ -29,7 +29,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalSelect = document.getElementById('modal-status-select');
 
     let currentTargetElement = null;
-    let currentRawDate = ""; // API送信用に日付文字列を保持
+    let currentRawDate = ""; 
+    
+    // ▼▼▼ 追加: 本当の学籍番号を保持する変数 ▼▼▼
+    let currentRealStudentId = ""; 
 
     // ステータスセルクリックイベント
     const statusCells = document.querySelectorAll('.status');
@@ -39,9 +42,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const row = cell.closest('tr');
             
-            // 出席番号
+            // ▼▼▼ 修正: 行(tr)から data-real-id を取得 ▼▼▼
+            currentRealStudentId = row.dataset.realId; 
+
+            // 表示用の出席番号
             const studentIdEl = row.querySelector('.student-id');
-            const studentId = studentIdEl ? studentIdEl.textContent.trim() : '';
+            const studentIdDisplay = studentIdEl ? studentIdEl.textContent.trim() : '';
 
             // 氏名
             const studentNameEl = row.querySelector('.student-name');
@@ -54,10 +60,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const headerRow = document.querySelector('.result-table thead tr');
             const targetHeader = headerRow ? headerRow.children[tdIndex] : null;
             
-            // 生の日付文字列 (YYYY-MM-DD) を保持
             currentRawDate = targetHeader ? targetHeader.textContent.trim() : '';
 
-            // 表示用にフォーマット (M月D日)
+            // 表示用に日付フォーマット
             let dateDisplay = currentRawDate;
             try {
                 const d = new Date(currentRawDate);
@@ -70,8 +75,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const rawPeriod = cell.dataset.period || '1';
             const periodText = rawPeriod + 'コマ目';
 
-            // モーダルにセット
-            if (modalStudentNum) modalStudentNum.textContent = studentId;
+            // モーダルにセット (表示は出席番号のまま)
+            if (modalStudentNum) modalStudentNum.textContent = studentIdDisplay;
             if (modalStudentName) modalStudentName.textContent = studentName;
             if (modalDate) modalDate.textContent = dateDisplay;
             if (modalPeriod) modalPeriod.textContent = periodText;
@@ -110,17 +115,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ▼▼▼ 変更ボタンクリック時の処理 (API送信) ▼▼▼
+    // 変更ボタンクリック時の処理 (API送信)
     if (modalSaveBtn && modal) {
         modalSaveBtn.addEventListener('click', async function() {
             if (currentTargetElement && modalSelect) {
                 const selectedValue = modalSelect.value;
                 const selectedText = modalSelect.options[modalSelect.selectedIndex].text;
                 
-                // URLパラメータからクラス名を取得
                 const urlParams = new URLSearchParams(window.location.search);
                 const className = urlParams.get('class_name');
-                const studentNumber = modalStudentNum.textContent; 
+                
                 // "1コマ目" -> "1" に変換
                 const periodStr = modalPeriod.textContent.replace('コマ目', '');
                 const period = parseInt(periodStr) || 1;
@@ -137,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             class_name: className,
-                            student_number: studentNumber,
+                            student_number: currentRealStudentId, // ▼▼▼ 修正: ここで本当のIDを送信 ▼▼▼
                             date: currentRawDate,
                             period: period,
                             status: selectedText,

@@ -33,7 +33,7 @@
                 </thead>
                 <tbody>
                     {% for student in students_data %}
-                    <tr>
+                    <tr data-real-id="{{ student.student_number }}">
                         <td class="fixed-col student-id">{{ student.number }}</td>
                         <td class="fixed-col name-col student-name">{{ student.name }}</td>
                         
