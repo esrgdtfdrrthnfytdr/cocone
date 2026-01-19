@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     
-    // --- ページ遷移ボタン ---
+    // --- 戻るボタン ---
     const backBtn = document.getElementById('back-btn');
     if (backBtn) {
         backBtn.addEventListener('click', function() {
@@ -8,68 +8,64 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- ダウンロードボタン ---
     const downloadBtn = document.getElementById('download-btn');
     if (downloadBtn) {
         downloadBtn.addEventListener('click', function() {
             alert('CSVファイルのダウンロードを開始します...');
-            // ここにダウンロード処理を実装
+            // CSVダウンロード処理の実装場所
         });
     }
 
     // --- モーダル制御 ---
     const modal = document.getElementById('change-status-modal');
-    // 閉じるボタンのIDを変更
     const modalCloseBtn = document.getElementById('modal-close-btn');
     const modalSaveBtn = document.getElementById('modal-save-btn');
     
-    // モーダル内の表示要素
+    // モーダル内要素
     const modalName = document.getElementById('modal-student-name');
     const modalDate = document.getElementById('modal-date');
     const modalPeriod = document.getElementById('modal-period');
     const modalSelect = document.getElementById('modal-status-select');
-    // 備考欄を追加
     const modalNote = document.getElementById('modal-note');
 
-    // 編集対象を保持する変数
+    // 編集対象の保持
     let currentTargetElement = null;
 
-    // ステータスセル(.status)すべてにクリックイベントを設定
+    // ステータスセルクリック時
     const statusCells = document.querySelectorAll('.status');
     statusCells.forEach(function(cell) {
         cell.addEventListener('click', function() {
             currentTargetElement = cell;
 
-            // 1. 親の行(tr)から氏名を取得
+            // 1. 名前取得
             const row = cell.closest('tr');
             const studentNameEl = row.querySelector('.student-name');
             const studentName = studentNameEl ? studentNameEl.textContent : '';
 
-            // 2. 列インデックスから日付を取得
+            // 2. 日付取得
             const cellTd = cell.closest('td');
             const allTds = Array.from(row.children);
             const tdIndex = allTds.indexOf(cellTd);
             
-            // ヘッダー行を取得して、同じインデックスのテキスト(日付)を取得
             const headerRow = document.querySelector('.result-table thead tr');
-            // 固定列が2つある前提のインデックス指定
             const targetHeader = headerRow ? headerRow.children[tdIndex] : null;
-            const dateText = targetHeader ? targetHeader.textContent : '不明な日付';
+            const dateText = targetHeader ? targetHeader.textContent : '';
 
-            // 3. コマ数を取得
-            const periodText = cell.dataset.period ? cell.dataset.period + '限' : '不明';
+            // 3. 時限取得
+            const periodText = cell.dataset.period ? cell.dataset.period + '限' : '';
 
-            // 4. モーダルに情報をセット
+            // 4. モーダルにセット
             if (modalName) modalName.textContent = studentName;
             if (modalDate) modalDate.textContent = dateText;
             if (modalPeriod) modalPeriod.textContent = periodText;
-            // 備考欄をクリア（現状データを持っていないため）
-            if (modalNote) modalNote.value = '';
+            if (modalNote) modalNote.value = ''; // 備考は初期化
 
-            // 5. 現在のクラスからセレクトボックスの初期値を推測してセット
+            // 5. 現在のステータスを選択
             if (modalSelect) {
                 const statusClasses = ['attend', 'absent', 'late', 'early', 'public-abs', 'special-abs', 'no-data'];
                 let currentStatus = 'no-data';
-                // クラスリストから該当するステータスを探す
+                
                 statusClasses.forEach(cls => {
                     if (cell.classList.contains(cls)) {
                         currentStatus = cls;
@@ -78,12 +74,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 modalSelect.value = currentStatus;
             }
 
-            // モーダル表示
+            // 表示
             if (modal) modal.classList.add('active');
         });
     });
 
-    // モーダルを閉じる関数
+    // モーダルを閉じる
     function closeModal() {
         if (modal) {
             modal.classList.remove('active');
@@ -91,42 +87,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 閉じるボタンで閉じる
-    if (modalCloseBtn) {
-        modalCloseBtn.addEventListener('click', closeModal);
-    }
-
-    // 背景クリックで閉じる
+    if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeModal);
+    
     if (modal) {
         modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                closeModal();
-            }
+            if (e.target === modal) closeModal();
         });
     }
 
-    // 変更を保存（画面表示のみ更新）
+    // 保存ボタン（簡易反映のみ）
     if (modalSaveBtn && modal) {
         modalSaveBtn.addEventListener('click', function() {
             if (currentTargetElement && modalSelect) {
                 const selectedValue = modalSelect.value;
                 const selectedText = modalSelect.options[modalSelect.selectedIndex].text;
-                const noteValue = modalNote ? modalNote.value : ''; // 備考の値を取得
-
-                // クラスを全削除してリセット
+                
+                // クラス更新
                 currentTargetElement.className = 'status'; 
-                
-                // 新しいクラスを追加
                 currentTargetElement.classList.add(selectedValue);
-                // テキストを変更
                 currentTargetElement.textContent = selectedText;
+
+                console.log(`Saved: ${selectedText}, Note: ${modalNote ? modalNote.value : ''}`);
                 
-                // 備考は現状画面には反映しませんが、取得はできています
-                console.log(`保存: ステータス=${selectedText}, 備考=${noteValue}`);
-
-                // ここでサーバーに保存する処理を実装する想定
-
-                // モーダルを閉じる
                 closeModal();
             }
         });

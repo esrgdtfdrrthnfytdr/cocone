@@ -7,6 +7,58 @@
 {% endblock %}
 
 {% block content %}
+    <h1>{{ class_name }}　{{ start_date }} から {{ end_date }} までの出欠席</h1>
+
+    <div class="result-container">
+        {% if error %}
+            <div style="color: red; font-weight: bold; text-align: center; margin-bottom: 20px;">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <div class="action-bar">
+            <button id="download-btn" class="download-btn">ダウンロード</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="result-table" id="attendance-table">
+                <thead>
+                    <tr>
+                        <th class="fixed-col">出席番号</th>
+                        <th class="fixed-col name-col">氏名</th>
+                        {% for date in date_headers %}
+                            <th>{{ date }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students_data %}
+                    <tr>
+                        <td class="fixed-col student-id">{{ student.number }}</td>
+                        <td class="fixed-col name-col student-name">{{ student.name }}</td>
+                        
+                        {% for date in date_headers %}
+                        <td>
+                            <div class="cell-stack">
+                                {% if student.dates[date] %}
+                                    {% for status in student.dates[date] %}
+                                        <span class="status {{ status.class }}" data-period="{{ status.period }}">
+                                            {{ status.text }}
+                                        </span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="status no-data">データなし</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
     <button id="back-btn" class="back-btn">戻る</button>
 
     <div id="change-status-modal" class="modal-overlay">
@@ -44,7 +96,7 @@
                 
                 <div class="form-group">
                     <label for="modal-note">備考</label>
-                    <textarea id="modal-note" rows="4"></textarea>
+                    <textarea id="modal-note" rows="3"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
