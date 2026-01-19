@@ -7,90 +7,52 @@
 {% endblock %}
 
 {% block content %}
-    <h1>{{ class_name }}　{{ start_date }} から {{ end_date }} までの出欠席</h1>
-
-    <div class="result-container">
-        {% if error %}
-            <div style="color: red; font-weight: bold; text-align: center; margin-bottom: 20px;">
-                {{ error }}
-            </div>
-        {% endif %}
-
-        <div class="action-bar">
-            <button id="download-btn" class="download-btn">ダウンロード</button>
-        </div>
-
-        <div class="table-wrapper">
-            <table class="result-table" id="attendance-table">
-                <thead>
-                    <tr>
-                        <th class="fixed-col">出席番号</th>
-                        <th class="fixed-col name-col">氏名</th>
-                        {% for date in date_headers %}
-                            <th>{{ date }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in students_data %}
-                    <tr>
-                        <td class="fixed-col student-id">{{ student.number }}</td>
-                        
-                        <td class="fixed-col name-col student-name">{{ student.name }}</td>
-                        
-                        {% for date in date_headers %}
-                        <td>
-                            <div class="cell-stack">
-                                {% if student.dates[date] %}
-                                    {% for status in student.dates[date] %}
-                                        <span class="status {{ status.class }}" data-period="{{ status.period }}">
-                                            {{ status.text }}
-                                        </span>
-                                    {% endfor %}
-                                {% else %}
-                                    <span class="status no-data">データなし</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
     <button id="back-btn" class="back-btn">戻る</button>
 
     <div id="change-status-modal" class="modal-overlay">
-        <div class="modal-content change-modal-content">
-            <h2>出欠席状態の変更</h2>
-            <div class="modal-info">
-                <p><strong>氏名:</strong> <span id="modal-student-name"></span> (<span id="modal-student-id"></span>)</p>
-                <p><strong>日付:</strong> <span id="modal-date"></span></p>
-                <p><strong>時限:</strong> <span id="modal-period"></span></p>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h2>出欠席状態変更</h2>
+                <button id="modal-close-btn" class="close-btn">&times;</button>
             </div>
-            
-            <div class="status-select-area">
-                <label for="modal-status-select">状態:</label>
-                <select id="modal-status-select">
-                    <option value="attend">出席</option>
-                    <option value="absent">欠席</option>
-                    <option value="late">遅刻</option>
-                    <option value="early">早退</option>
-                    <option value="public-abs">公欠</option>
-                    <option value="special-abs">特欠</option>
-                    <option value="no-data">データなし</option>
-                </select>
+            <div class="modal-body">
+                <div class="info-row">
+                    <span class="info-label">対象学生</span>
+                    <span id="modal-student-name" class="info-value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">対象日付</span>
+                    <span id="modal-date" class="info-value"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">対象時限</span>
+                    <span id="modal-period" class="info-value"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modal-status-select">状態</label>
+                    <select id="modal-status-select">
+                        <option value="attend">出席</option>
+                        <option value="absent">欠席</option>
+                        <option value="late">遅刻</option>
+                        <option value="early">早退</option>
+                        <option value="public-abs">公欠</option>
+                        <option value="special-abs">特欠</option>
+                        <option value="no-data">データなし</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modal-note">備考</label>
+                    <textarea id="modal-note" rows="4"></textarea>
+                </div>
             </div>
-
-            <div class="modal-btn-area">
-                <button id="modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
-                <button id="modal-save-btn" class="modal-btn save-btn">保存</button>
+            <div class="modal-footer">
+                <button id="modal-save-btn" class="save-btn">保存する</button>
             </div>
         </div>
     </div>
-{% endblock %}
+    {% endblock %}
 
 {% block extra_js %}
     <script src="{{ url_for('static', path='/js/result.js') }}"></script>
