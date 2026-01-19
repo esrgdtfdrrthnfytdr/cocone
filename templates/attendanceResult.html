@@ -62,30 +62,30 @@
     <button id="back-btn" class="back-btn">戻る</button>
 
     <div id="change-status-modal" class="modal-overlay">
-        <div class="modal-window">
-            <h2 class="modal-title">出欠席状態の変更</h2>
+        <div class="custom-modal-window">
+            <h2 class="custom-modal-title">出欠席状態の変更</h2>
             
-            <div class="modal-content-grid">
-                <div class="info-row">
-                    <span class="info-label">出席番号</span>
-                    <span id="modal-student-number" class="info-value"></span>
+            <div class="custom-info-grid">
+                <div class="custom-row">
+                    <span class="custom-label">出席番号</span>
+                    <span id="modal-student-number" class="custom-value">--</span>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">氏名</span>
-                    <span id="modal-student-name" class="info-value"></span>
+                <div class="custom-row">
+                    <span class="custom-label">氏名</span>
+                    <span id="modal-student-name" class="custom-value">--</span>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">変更日</span>
-                    <span id="modal-date" class="info-value"></span>
+                <div class="custom-row">
+                    <span class="custom-label">変更日</span>
+                    <span id="modal-date" class="custom-value">--</span>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">変更コマ</span>
-                    <span id="modal-period" class="info-value"></span>
+                <div class="custom-row">
+                    <span class="custom-label">変更コマ</span>
+                    <span id="modal-period" class="custom-value">--</span>
                 </div>
             </div>
 
-            <div class="select-area">
-                <p class="select-label">出欠席状態の選択</p>
+            <div class="custom-select-area">
+                <p class="custom-select-label">出欠席状態の選択</p>
                 <div class="custom-select-wrapper">
                     <select id="modal-status-select">
                         <option value="attend">出席</option>
@@ -99,9 +99,9 @@
                 </div>
             </div>
 
-            <div class="modal-buttons">
-                <button id="modal-close-btn" class="modal-btn btn-back">戻る</button>
-                <button id="modal-save-btn" class="modal-btn btn-change">変更</button>
+            <div class="custom-modal-buttons">
+                <button id="modal-close-btn" class="custom-btn btn-gray">戻る</button>
+                <button id="modal-save-btn" class="custom-btn btn-green">変更</button>
             </div>
         </div>
     </div>

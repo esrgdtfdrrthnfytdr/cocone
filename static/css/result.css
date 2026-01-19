@@ -1,11 +1,5 @@
-/* --- ベーススタイル（変更なし） --- */
-.result-container {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-}
+/* --- 既存のテーブル等のスタイルは維持してください --- */
+.result-container { background-color: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
 h1 { font-size: 1.5rem; margin-bottom: 20px; color: #333; text-align: center; }
 .action-bar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .download-btn { background-color: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
@@ -30,90 +24,93 @@ h1 { font-size: 1.5rem; margin-bottom: 20px; color: #333; text-align: center; }
 .back-btn { background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 20px; }
 
 
-/* ▼▼▼ モーダルウィンドウのスタイル（画像再現） ▼▼▼ */
+/* ▼▼▼ モーダルウィンドウ完全修正CSS（ここから下を上書き） ▼▼▼ */
 
+/* 背景のオーバーレイ */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6); /* 少し濃いめの背景 */
-    display: none;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4); /* 暗い背景 */
+    display: none; /* 初期非表示 */
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 9999; /* 最前面 */
 }
 
 .modal-overlay.active {
     display: flex;
 }
 
-.modal-window {
-    background-color: #fff;
-    width: 550px;
+/* ウィンドウ本体 */
+.custom-modal-window {
+    width: 500px;
     max-width: 90%;
-    border-radius: 20px; /* 大きめの角丸 */
-    padding: 40px 50px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-    text-align: center;
-    position: relative;
+    background-color: #ffffff; /* 白背景を強制 */
+    border-radius: 10px;       /* 角丸 */
+    padding: 30px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    font-family: sans-serif;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     box-sizing: border-box;
 }
 
-/* タイトル */
-.modal-title {
-    font-size: 1.8rem;
+/* タイトル "出欠席状態の変更" */
+.custom-modal-title {
+    font-size: 1.5rem;
     font-weight: bold;
-    color: #333;
-    margin: 0 0 30px 0;
-    letter-spacing: 1px;
+    margin: 0 0 25px 0;
+    color: #000;
 }
 
-/* 情報グリッド */
-.modal-content-grid {
+/* 情報グリッド (出席番号、氏名など) */
+.custom-info-grid {
+    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 15px; /* 行間 */
     margin-bottom: 30px;
-    padding: 0 40px; /* 中央寄せのためのパディング */
 }
 
-.info-row {
+.custom-row {
     display: flex;
+    justify-content: center; /* 中央寄せ */
     align-items: center;
-    justify-content: center; /* 行全体を中央揃え */
+    width: 100%;
 }
 
-.info-label {
+.custom-label {
+    width: 120px;
+    text-align: right;
     font-weight: bold;
     font-size: 1rem;
-    color: #333;
-    width: 100px;
-    text-align: right;
     margin-right: 30px; /* ラベルと値の間隔 */
 }
 
-.info-value {
-    font-weight: bold;
-    font-size: 1.4rem; /* 値を大きく強調 */
-    color: #000;
+.custom-value {
+    width: 150px;
     text-align: left;
-    flex: 1; /* 残り幅を使う */
-    max-width: 200px; /* 左寄せっぽく見せるための幅制限 */
-}
-
-/* セレクトエリア */
-.select-area {
-    margin-bottom: 40px;
-}
-
-.select-label {
     font-weight: bold;
+    font-size: 1.4rem; /* 値は大きく */
+}
+
+/* セレクトボックスエリア */
+.custom-select-area {
+    margin-bottom: 30px;
+    text-align: center;
+    width: 100%;
+}
+
+.custom-select-label {
     font-size: 0.9rem;
-    color: #333;
-    margin-bottom: 10px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
 }
 
 .custom-select-wrapper {
@@ -124,70 +121,69 @@ h1 { font-size: 1.5rem; margin-bottom: 20px; color: #333; text-align: center; }
 
 .custom-select-wrapper select {
     width: 100%;
-    padding: 10px 15px;
-    border: 2px solid #333; /* 太めの黒枠 */
-    border-radius: 8px;
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: #333;
+    padding: 10px;
+    font-size: 1.2rem;
+    border: 2px solid #333; /* 太い黒枠 */
+    border-radius: 5px;
     background-color: #fff;
-    cursor: pointer;
-    appearance: none; /* デフォルトの矢印を消す */
-    -webkit-appearance: none;
-    text-align: center;
-}
-
-/* カスタム矢印（V） */
-.custom-select-wrapper::after {
-    content: 'V';
-    font-family: sans-serif;
     font-weight: bold;
-    position: absolute;
-    top: 50%;
-    right: 15px;
-    transform: translateY(-50%) scaleX(1.2);
-    pointer-events: none;
-    color: #999;
-    font-size: 0.9rem;
+    text-align: center;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
+/* 擬似要素でV矢印を作る */
+.custom-select-wrapper::after {
+    content: "V";
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%) scaleX(1.3);
+    pointer-events: none;
+    font-weight: bold;
+    color: #999;
+    font-family: sans-serif;
+    font-size: 0.8rem;
+}
 
 /* ボタンエリア */
-.modal-buttons {
+.custom-modal-buttons {
     display: flex;
+    gap: 20px;
     justify-content: center;
-    gap: 30px;
+    width: 100%;
 }
 
-.modal-btn {
+/* ボタン共通スタイル */
+.custom-btn {
     width: 160px;
-    padding: 12px 0;
-    border-radius: 50px; /* ピル型 */
+    height: 50px;
+    border-radius: 25px; /* 完全な丸み（ピル型） */
+    border: 2px solid #333; /* 太い黒枠 */
     font-size: 1.2rem;
     font-weight: bold;
+    color: #fff;
     cursor: pointer;
-    border: 3px solid #444; /* 太い枠線 */
-    /* 立体的な影（下方向） */
-    box-shadow: 0 4px 0 #444; 
+    /* 立体的な影 */
+    box-shadow: 0 4px 0 #333;
     transition: transform 0.1s, box-shadow 0.1s;
-    outline: none;
 }
 
-.modal-btn:active {
+.custom-btn:active {
     transform: translateY(2px);
-    box-shadow: 0 2px 0 #444;
+    box-shadow: 0 2px 0 #333;
 }
 
-/* 戻るボタン（グレー系） */
-.btn-back {
-    background: linear-gradient(to bottom, #bdc3c7, #95a5a6);
-    color: #fff;
-    text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+/* 戻るボタン (グレー) */
+.btn-gray {
+    background-color: #95a5a6; /* グレー */
+    /* グラデーションで立体感を出す場合 */
+    background: linear-gradient(to bottom, #aab7b8, #95a5a6);
 }
 
-/* 変更ボタン（グリーン系） */
-.btn-change {
-    background: linear-gradient(to bottom, #63d2b0, #4eb899);
-    color: #fff;
-    text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+/* 変更ボタン (緑/ティール) */
+.btn-green {
+    background-color: #63d2b0; /* 指定画像に近い色 */
+    background: linear-gradient(to bottom, #7ee0c4, #63d2b0);
 }
