@@ -1,56 +1,21 @@
 {% extends "layout.html" %}
 
-{% block title %}出席確認 | cocone{% endblock %}
+{% block title %}出席確認｜cocone{% endblock %}
 
 {% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('static', path='/css/teacher.css') }}">
 {% endblock %}
 
 {% block content %}
-    <div class="rollcall-container">
-        <h1>出席確認開始</h1>
-        <p class="description">
-            クラスを選択し、「授業開始」ボタンを押してください。<br>
-            現在時刻から授業コマが自動判定され、出席受付が開始されます。
-        </p>
-
-        <div class="main-panel">
-            <div class="status-display">
-                <span id="status-text">待機中</span>
+        <h1>出席確認</h1>
+        <div class="form-container">
             </div>
 
-            <div class="otp-area">
-                <div class="otp-label">現在のOTP</div>
-                <div id="otp-display" class="otp-number">----</div>
-            </div>
-
-            <div class="form-container">
-                <label for="course-select">対象クラスの選択</label>
-                <div class="select-wrapper">
-                    <select id="course-select">
-                        <option value="" disabled selected>クラスを選択してください</option>
-                        {% for class_item in classes %}
-                            <option value="{{ class_item.id }}">{{ class_item.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <p id="error-message" class="error-message"></p>
-                
-                <div class="control-group">
-                    <label for="volume-slider">音量設定</label>
-                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
-                </div>
-
-                <div class="button-area">
-                    <button id="start-btn" class="action-btn start-btn">授業開始</button>
-                    <button id="stop-btn" class="action-btn stop-btn" disabled>終了</button>
-                </div>
-            </div>
-        </div>
-    </div>
+        <button id="submit-btn" class="circle-button">出席確認</button>
+        <div id="status-area" style="margin-top:20px; color:#666;"></div>
 {% endblock %}
 
 {% block extra_js %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="{{ url_for('static', path='/js/teacher.js') }}"></script>
 {% endblock %}
