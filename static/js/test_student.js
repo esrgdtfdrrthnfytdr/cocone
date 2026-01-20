@@ -133,7 +133,10 @@ function updateLoop() {
 }
 
 // ==========================================
-//      多数決方式（オーバーサンプリング）
+//      多数決方式（デバッグ・安定化強化版）
+// ==========================================
+// ==========================================
+//      多数決方式（デバッグ・安定化強化版）
 // ==========================================
 function startReceivingSequence() {
     if (state !== "IDLE") return;
@@ -142,18 +145,18 @@ function startReceivingSequence() {
     let bitCount = 0;
 
     const readBit = () => {
-        // ★修正：各ビットごとにサンプリング変数を初期化
         let samples = [];      
         let sampleCount = 0;   
-        const maxSamples = 8;  
-        const sampleInterval = 50; 
+        const maxSamples = 12;      // サンプル数を増やして精度を上げる
+        const sampleInterval = 35;  // 間隔をさらに詰める
 
         const takeSample = () => {
             const freq = getDominantFrequency();
             let bit = null;
             
-            if (freq > FREQ_BIT_1_MIN && freq < FREQ_BIT_1_MAX) bit = "1";
-            else if (freq > FREQ_BIT_0_MIN && freq < FREQ_BIT_0_MAX) bit = "0";
+            // 判定幅を少し広めに設定 (±250Hz)
+            if (freq > 19250 && freq < 19750) bit = "1";      // 19500Hz付近
+            else if (freq > 18250 && freq < 18750) bit = "0"; // 18500Hz付近
             
             if (bit !== null) samples.push(bit);
             sampleCount++;
@@ -161,21 +164,32 @@ function startReceivingSequence() {
             if (sampleCount < maxSamples) {
                 setTimeout(takeSample, sampleInterval);
             } else {
-                // 多数決判定ロジック
                 const count1 = samples.filter(s => s === "1").length;
                 const count0 = samples.filter(s => s === "0").length;
                 
-                // どちらかが2回以上検知されていれば優勢な方を採用
                 let finalBit = "x";
-                if (count1 >= 2 && count1 > count0) finalBit = "1";
-                else if (count0 >= 2 && count0 >= count1) finalBit = "0";
+                
+                // 判定ロジックの調整
+                // 1または0が少しでも（2回以上）検知されれば、多い方を採用
+                if (count1 >= 2 && count1 > count0) {
+                    finalBit = "1";
+                } else if (count0 >= 2 && count0 >= count1) {
+                    finalBit = "0";
+                } else if (count1 === 1 || count0 === 1) {
+                    // 1回しか検知できなかった場合の救済措置
+                    finalBit = count1 > count0 ? "1" : "0";
+                }
                 
                 detectedBits += finalBit;
                 bitCount++;
-                console.log(`ビット${bitCount}確定: ${finalBit} (1検出:${count1}, 0検出:${count0})`);
+                
+                // ★詳細ログ：これで原因が特定できます
+                console.log(`Bit ${bitCount} 確定プロセス: 最終=${finalBit} (詳細 -> 1検知数:${count1}, 0検知数:${count0}, サンプル総数:${samples.length})`);
+                
+                if (debugBits) debugBits.innerText += finalBit + " ";
 
                 if (bitCount < 4) {
-                    setTimeout(readBit, 150); 
+                    setTimeout(readBit, 100); 
                 } else {
                     finishReceiving();
                 }
@@ -183,9 +197,9 @@ function startReceivingSequence() {
         };
         takeSample();
     };
-    setTimeout(readBit, 500);
+    // スタート合図検知後の待ち時間を少し短縮して食い込みを防ぐ
+    setTimeout(readBit, 400); 
 }
-
 async function finishReceiving() {
     state = "IDLE";
     isListening = false;
