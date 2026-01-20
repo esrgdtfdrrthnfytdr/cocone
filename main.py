@@ -113,7 +113,7 @@ async def roll_call(request: Request):
 
 #テスト用ページのパス
 @app.get("/test_teacher", response_class=HTMLResponse)
-async def test_teacher(request: Request, db):
+async def test_teacher(request: Request):
     role = request.session.get("role")
     user_id = request.session.get("user_id")
     if role != "teacher": return RedirectResponse(url="/", status_code=303)
