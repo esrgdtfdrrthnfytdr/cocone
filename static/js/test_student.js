@@ -4,27 +4,18 @@ let audioCtx, analyser, dataArray;
 let isListening = false;
 let detectedBits = "";
 let state = "IDLE";
-let dynamicThreshold = 35; // キャリブレーションで動的に上書きされます
-
-// static/js/test_student.js
+let dynamicThreshold = 35; 
 
 // ==========================================
 // 周波数設定（高周波シフト版）
 // ==========================================
-
-// スタート信号（19000Hz付近）：ここは実績があるのでそのまま維持
 const FREQ_MARKER_MIN = 18900; 
-const FREQ_MARKER_MAX = 19100; 
-
-// ビット0（19300Hz付近）：ここが今回のキモです
+const FREQ_MARKER_MAX = 19100; // 19000Hz
 const FREQ_BIT_0_MIN  = 19200;
-const FREQ_BIT_0_MAX  = 19400; 
-
-// ビット1（19700Hz付近）：さらに高い位置へ
+const FREQ_BIT_0_MAX  = 19400; // 19300Hz
 const FREQ_BIT_1_MIN  = 19600;
-const FREQ_BIT_1_MAX  = 19800;
+const FREQ_BIT_1_MAX  = 19800; // 19700Hz
 
-// UI要素
 const registerBtn = document.getElementById('register-btn');
 const statusMsg = document.getElementById('status-msg');
 const modal = document.getElementById('completion-modal');
@@ -32,15 +23,10 @@ const modalCloseBtn = document.getElementById('modal-close-btn');
 const debugFreq = document.getElementById('debug-freq');
 const debugBits = document.getElementById('debug-bits');
 
-// --- イベントリスナー ---
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
         if (registerBtn.classList.contains('is-processing')) return;
-        try {
-            await startMic();
-        } catch (e) {
-            alert("マイクエラー: " + e);
-        }
+        try { await startMic(); } catch (e) { alert("マイクエラー: " + e); }
     });
 }
 
@@ -51,7 +37,6 @@ if (modalCloseBtn) {
     });
 }
 
-// --- 音響処理 ---
 async function startMic() {
     registerBtn.textContent = '信号を探しています...';
     registerBtn.classList.add('is-processing');
@@ -60,7 +45,6 @@ async function startMic() {
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // iOS対策：無音再生による制限解除
     const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
     const source = audioCtx.createBufferSource();
     source.buffer = emptyBuffer;
@@ -78,7 +62,7 @@ async function startMic() {
     const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.2; // 反応速度を重視
+    analyser.smoothingTimeConstant = 0.2; 
 
     const filter = audioCtx.createBiquadFilter();
     filter.type = "highpass";
@@ -88,11 +72,9 @@ async function startMic() {
     filter.connect(analyser);
     dataArray = new Uint8Array(analyser.frequencyBinCount);
     
-    // キャリブレーション（動的しきい値の設定）
     setTimeout(() => {
         analyser.getByteFrequencyData(dataArray);
         const avgNoise = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        // 感度を上げるためオフセットを少し下げる（+20 -> +15）
         dynamicThreshold = Math.max(30, avgNoise + 15); 
         console.log("Calibration complete. Threshold:", dynamicThreshold);
         
@@ -125,7 +107,6 @@ function updateLoop() {
     const freq = getDominantFrequency();
     if (debugFreq) debugFreq.innerText = freq > 0 ? Math.round(freq) + " Hz" : "---";
 
-    // スタート信号検知
     if (state === "IDLE" && freq > FREQ_MARKER_MIN && freq < FREQ_MARKER_MAX) {
         console.log("Start signal detected!");
         if(statusMsg) statusMsg.innerText = "信号を受信中...";
@@ -133,9 +114,6 @@ function updateLoop() {
     }
 }
 
-// ==========================================
-//      多数決方式（超高感度サンプリング）
-// ==========================================
 function startReceivingSequence() {
     if (state !== "IDLE") return;
     state = "RECEIVING";
@@ -145,8 +123,8 @@ function startReceivingSequence() {
     const readBit = () => {
         let samples = [];      
         let sampleCount = 0;   
-        const maxSamples = 15;      // サンプル数を増やして網を広げる
-        const sampleInterval = 25;  // 25ms間隔で超高速スキャン
+        const maxSamples = 15;      
+        const sampleInterval = 25;  
 
         const takeSample = () => {
             const freq = getDominantFrequency();
@@ -161,23 +139,21 @@ function startReceivingSequence() {
             if (sampleCount < maxSamples) {
                 setTimeout(takeSample, sampleInterval);
             } else {
-                // 多数決ロジックの緩和
                 const count1 = samples.filter(s => s === "1").length;
                 const count0 = samples.filter(s => s === "0").length;
                 
                 let finalBit = "x";
-                // 救済：1回でも検知された方を優先。同数なら高い方の「1」を優先。
                 if (count1 > 0 && count1 >= count0) finalBit = "1";
                 else if (count0 > 0) finalBit = "0";
                 
                 detectedBits += finalBit;
                 bitCount++;
-                console.log(`Bit ${bitCount}: ${finalBit} (1検知:${count1}, 0検知:${count0})`);
+                console.log(`Bit ${bitCount}: ${finalBit} (1:${count1}, 0:${count0})`);
                 
                 if (debugBits) debugBits.innerText = detectedBits; 
 
                 if (bitCount < 4) {
-                    setTimeout(readBit, 80); // 次のビットへの遷移
+                    setTimeout(readBit, 80); 
                 } else {
                     finishReceiving();
                 }
@@ -185,8 +161,10 @@ function startReceivingSequence() {
         };
         takeSample();
     };
-    // スタート信号後の「待ち」を350msに短縮
-    setTimeout(readBit, 350); 
+    
+    // ★ここが重要修正ポイント★
+    // スタート音(0.6秒)を完全にまたぐため、800ms待ってからビット1を読みに行く
+    setTimeout(readBit, 800); 
 }
 
 async function finishReceiving() {
