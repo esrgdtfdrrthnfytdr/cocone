@@ -57,51 +57,17 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for s in students %}
                     <tr>
-                        <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
-                        <td>20224055</td>
-                        <td>20224055-enkeihodo@hcs.ac.jp</td>
-                        <td>円形歩道</td>
-                        <td>R1A2</td>
-                        <td>13</td>
-                        <td>2025</td>
+                        <td class="checkbox-col"><input type="checkbox" class="user-checkbox" value="{{ s.student_number }}"></td>
+                        <td>{{ s.student_number }}</td>
+                        <td>{{ s.email }}</td>
+                        <td>{{ s.name }}</td>
+                        <td>{{ s.homeroom_class }}</td>
+                        <td>{{ s.attendance_no }}</td>
+                        <td>{{ s.student_number[:4] }}</td>
                     </tr>
-                    <tr>
-                        <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
-                        <td>20224055</td>
-                        <td>20224055-kikusuikogyo@hcs.ac.jp</td>
-                        <td>菊水工業</td>
-                        <td>R1A2</td>
-                        <td>14</td>
-                        <td>2025</td>
-                    </tr>
-                    <tr>
-                        <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
-                        <td>20224055</td>
-                        <td>20224055-johotaro@hcs.ac.jp</td>
-                        <td>情報太郎</td>
-                        <td>R1A2</td>
-                        <td>15</td>
-                        <td>2025</td>
-                    </tr>
-                    <tr>
-                        <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
-                        <td>20224055</td>
-                        <td>20224055-horenso@hcs.ac.jp</td>
-                        <td>報連相</td>
-                        <td>R1A2</td>
-                        <td>16</td>
-                        <td>2025</td>
-                    </tr>
-                    <tr>
-                        <td class="checkbox-col"><input type="checkbox" class="user-checkbox"></td>
-                        <td>20224055</td>
-                        <td>20224055-tesutodeta@hcs.ac.jp</td>
-                        <td>手巣斗出太</td>
-                        <td>R1A2</td>
-                        <td>17</td>
-                        <td>2025</td>
-                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
