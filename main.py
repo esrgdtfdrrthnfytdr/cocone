@@ -7,8 +7,9 @@ from typing import Optional, List
 from collections import defaultdict
 import csv
 import io
+import codecs
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -396,6 +397,64 @@ async def add_user(req: AddUserRequest):
     except Exception as e:
         print(f"Add User Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/upload_users_csv")
+async def upload_users_csv(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        
+        decoded_content = None
+        for encoding in ['utf-8-sig', 'utf-8', 'cp932']:
+            try:
+                decoded_content = content.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if decoded_content is None:
+            return JSONResponse({"status": "error", "message": "ファイルの文字コードを判別できませんでした。UTF-8またはShift-JISで保存してください。"}, status_code=400)
+
+        csv_reader = csv.reader(io.StringIO(decoded_content))
+        rows = list(csv_reader)
+        
+        if not rows:
+             return JSONResponse({"status": "error", "message": "ファイルの中身が空です"}, status_code=400)
+
+        with engine.begin() as conn:
+            success_count = 0
+            for i, row in enumerate(rows):
+                if not row or all(c.strip() == '' for c in row):
+                    continue
+
+                if i == 0 and ("学籍番号" in row[0] or "student" in row[0].lower()):
+                    continue
+
+                if len(row) < 6:
+                    continue
+
+                s_no = row[0].strip()
+                name = row[1].strip()
+                email = row[2].strip()
+                pw = row[3].strip()
+                cls = row[4].strip()
+                try:
+                    att_no = int(row[5].strip())
+                except ValueError:
+                    att_no = 0
+
+                exist = conn.execute(text("SELECT 1 FROM students WHERE student_number = :id"), {"id": s_no}).fetchone()
+                if not exist:
+                    conn.execute(
+                        text("INSERT INTO students (student_number, name, email, password_hash, homeroom_class, attendance_no) VALUES (:id, :name, :email, :pass, :cls, :no)"),
+                        {"id": s_no, "name": name, "email": email, "pass": pw, "cls": cls, "no": att_no}
+                    )
+                    success_count += 1
+                
+        return JSONResponse({"status": "success", "message": f"{success_count}件のユーザーを追加しました"})
+
+    except Exception as e:
+        print(f"CSV Upload Error: {e}")
+        return JSONResponse({"status": "error", "message": f"処理中にエラーが発生しました: {str(e)}"}, status_code=500)
 
 @app.get("/api/download_csv")
 async def download_csv(class_name: str, start_date: str, end_date: str):
