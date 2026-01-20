@@ -234,10 +234,8 @@ async def user_management(request: Request):
                 val = r.student_number
                 admission_year = ""
                 if val:
-                    # s20250001 -> 2025 (4 digits)
                     if val.startswith('s') and len(val) >= 5:
                         admission_year = val[1:5]
-                    # 20224055 -> 2022 (4 digits)
                     elif len(val) >= 4:
                         admission_year = val[:4]
                 

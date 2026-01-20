@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await res.json();
 
                 if (data.status === 'success') {
-                    alert(`${nameVal} を追加しました`);
+                    // alertなしでリロード
                     location.reload();
                 } else {
                     modalErrorArea.textContent = data.message || '登録に失敗しました';
