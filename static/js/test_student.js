@@ -6,11 +6,12 @@ let detectedBits = "";
 let state = "IDLE";
 let dynamicThreshold = 30;
 
-// 周波数設定（Teacher側 1.0秒送信モードに対応）
-const FREQ_MARKER_MIN = 18800; const FREQ_MARKER_MAX = 19200; // Marker: 19000
-const FREQ_BIT_0_MIN  = 19150; const FREQ_BIT_0_MAX  = 19450; // Bit 0: 19300
-const FREQ_BIT_1_MIN  = 19550; const FREQ_BIT_1_MAX  = 19850; // Bit 1: 19700
+// 周波数設定（Teacher側と同期）
+const FREQ_MARKER_MIN = 18800; const FREQ_MARKER_MAX = 19200;
+const FREQ_BIT_0_MIN  = 19150; const FREQ_BIT_0_MAX  = 19450;
+const FREQ_BIT_1_MIN  = 19550; const FREQ_BIT_1_MAX  = 19850;
 
+// UI要素
 const registerBtn = document.getElementById('register-btn');
 const statusMsg = document.getElementById('status-msg');
 const modal = document.getElementById('completion-modal');
@@ -68,7 +69,7 @@ async function startMic() {
         analyser.getByteFrequencyData(dataArray);
         const avgNoise = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         dynamicThreshold = Math.max(10, avgNoise + 8); 
-        console.log("Calibration complete. Threshold:", dynamicThreshold);
+        console.log("Calibration complete:", dynamicThreshold);
         
         isListening = true;
         state = "IDLE";
@@ -101,7 +102,7 @@ function updateLoop() {
         if (debugFreq) debugFreq.innerText = freq > 0 ? Math.round(freq) + " Hz" : "---";
 
         if (freq > FREQ_MARKER_MIN && freq < FREQ_MARKER_MAX) {
-            console.log("🚀 START SIGNAL DETECTED");
+            console.log("🚀 START DETECTED");
             if(statusMsg) statusMsg.innerText = "受信開始...";
             startReceivingSequence();
         }
@@ -116,8 +117,7 @@ function startReceivingSequence() {
     let bitCount = 0;
     if(debugBits) debugBits.innerText = "";
 
-    // ★修正点：1.6秒待つ（Start 1.0s + 余裕 0.6s）
-    // これでBit1の「安定した後半部分」から読み始めます
+    // ★黄金設定：1.6秒待機
     const INITIAL_WAIT = 1600; 
 
     const readBit = () => {
@@ -136,7 +136,6 @@ function startReceivingSequence() {
             if (bit !== null) samples.push(bit);
             
             if (debugFreq) debugFreq.innerText = `Scan: ${Math.round(freq)} Hz -> ${bit || '?'}`;
-
             sampleCount++;
 
             if (sampleCount < maxSamples) {
@@ -146,13 +145,9 @@ function startReceivingSequence() {
                 const count0 = samples.filter(s => s === "0").length;
                 
                 let finalBit = "x";
-                if (count1 === 0 && count0 === 0) {
-                    finalBit = "x";
-                } else if (count1 >= count0) {
-                    finalBit = "1";
-                } else {
-                    finalBit = "0";
-                }
+                if (count1 === 0 && count0 === 0) finalBit = "x";
+                else if (count1 >= count0) finalBit = "1";
+                else finalBit = "0";
                 
                 detectedBits += finalBit; 
                 bitCount++;
@@ -160,7 +155,6 @@ function startReceivingSequence() {
                 if (debugBits) debugBits.innerText = detectedBits; 
 
                 if (bitCount < 4) {
-                    // 次のビットまで0.6秒待機
                     setTimeout(readBit, 600); 
                 } else {
                     finishReceiving();
@@ -179,7 +173,7 @@ async function finishReceiving() {
     if (detectedBits.includes("x")) {
         if(statusMsg) statusMsg.innerText = "受信失敗: 再試行します";
         if(debugBits) debugBits.innerHTML += " <span style='color:red'>[失敗]</span>";
-        setTimeout(() => { resetUI(); }, 2000); 
+        setTimeout(() => { resetUI(); }, 2000);
         return;
     }
 
@@ -201,9 +195,8 @@ async function finishReceiving() {
             if (modal) modal.classList.add('active');
             if(statusMsg) statusMsg.innerText = "登録完了";
         } else {
-            // エラー表示を修正：正解がない場合も考慮
             let correctMsg = result.correct_otp ? ` (正解: ${result.correct_otp})` : "";
-            alert(`コード不一致\n受信したコード: ${val} (2進数: ${detectedBits})${correctMsg}`);
+            alert(`コード不一致: ${val} (バイナリ: ${detectedBits})${correctMsg}`);
             resetUI();
         }
     } catch(e) {

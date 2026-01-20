@@ -1,6 +1,6 @@
 // static/js/test_teacher.js
 
-let audioCtx = null; // 最初はnullにしておく
+let audioCtx = null;
 let bgmBuffer = null;
 let bgmSource = null;
 let bgmGainNode = null;
@@ -12,12 +12,12 @@ let isBgmOn = true;
 // --- 設定 ---
 const BGM_URL = '/static/sounds/bgm.wav';
 
-// 周波数設定（test_student.jsと同期）
+// 周波数設定（高周波シフト）
 const FREQ_START = 19000; 
 const FREQ_BIT_0 = 19300; 
 const FREQ_BIT_1 = 19700; 
 
-// 1ビットの長さ（1.0秒）
+// ★黄金設定：1.0秒
 const BIT_DURATION = 1.0; 
 const LOOP_GAP_SEC = 3.0;   
 const BGM_VOLUME = 0.4;
@@ -46,26 +46,23 @@ if (bgmToggleBtn) {
             bgmToggleBtn.textContent = "🔇 BGM: OFF";
             bgmToggleBtn.style.backgroundColor = "#95A5A6";
         }
-        // 再生中に音量変更
         if (bgmGainNode && audioCtx) {
             bgmGainNode.gain.setValueAtTime(isBgmOn ? BGM_VOLUME : 0, audioCtx.currentTime);
         }
     });
 }
 
-// ★修正点：ページ読み込み時ではなく、クリック時に初期化する関数
 async function initAudioContext() {
-    if (audioCtx) return; // すでに作成済みなら何もしない
+    if (audioCtx) return;
 
     window.AudioContext = window.AudioContext || window.webkitAudioContext;
     audioCtx = new AudioContext();
 
-    // BGMの読み込みもここで行う
     try {
         const response = await fetch(BGM_URL);
         const arrayBuffer = await response.arrayBuffer();
         bgmBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        console.log("BGM Loaded and Ready");
+        console.log("BGM Ready");
     } catch (e) {
         console.error("BGM Load Error:", e);
     }
@@ -73,13 +70,11 @@ async function initAudioContext() {
 
 if (submitBtn) {
     submitBtn.addEventListener('click', async () => {
-        // 停止処理
         if (isScanning) {
             stopSound();
             return;
         }
 
-        // ★ここで初めてオーディオ機能を起動（ブラウザ対策）
         await initAudioContext();
         if (audioCtx.state === 'suspended') {
             await audioCtx.resume();
@@ -91,7 +86,6 @@ if (submitBtn) {
         }
 
         try {
-            // APIからOTP取得
             const res = await fetch('/api/generate_otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -129,18 +123,13 @@ function stopScanningUI() {
 function playMixedSoundLoop(binaryStr) {
     if (!audioCtx) return;
 
-    // BGM再生
     if (bgmBuffer) {
-        // 前のBGMがあれば止める
         if (bgmSource) { try{ bgmSource.stop(); }catch(e){} }
-        
         bgmSource = audioCtx.createBufferSource();
         bgmSource.buffer = bgmBuffer;
         bgmSource.loop = true;
-
         bgmGainNode = audioCtx.createGain();
         bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-
         bgmSource.connect(bgmGainNode);
         bgmGainNode.connect(audioCtx.destination);
         bgmSource.start(0);
@@ -163,10 +152,10 @@ function playSignalRecursive(binaryStr) {
 
     const startTime = audioCtx.currentTime;
 
-    // 1. スタートマーカー
+    // Start Marker
     osc.frequency.setValueAtTime(FREQ_START, startTime);
 
-    // 2. データビット
+    // Data Bits
     for (let i = 0; i < binaryStr.length; i++) {
         const bit = binaryStr[i];
         const time = startTime + BIT_DURATION + (i * BIT_DURATION);
@@ -195,14 +184,8 @@ function stopSound() {
         clearTimeout(nextSignalTimer);
         nextSignalTimer = null;
     }
-    if(osc) {
-        try{ osc.stop(); }catch(e){}
-        osc = null;
-    }
-    if(bgmSource) {
-        try{ bgmSource.stop(); }catch(e){}
-        bgmSource = null;
-    }
+    if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
+    if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
     bgmGainNode = null;
     stopScanningUI();
 }
