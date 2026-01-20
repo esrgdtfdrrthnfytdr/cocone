@@ -17,7 +17,7 @@ const FREQ_START = 19000; // 開始マーカー
 const FREQ_BIT_1 = 19500; // ビット1
 const FREQ_BIT_0 = 18500; // ビット0
 
-const BIT_DURATION = 0.15;  // 1音の長さ（安定性のため少し長めに設定）
+const BIT_DURATION = 0.5;  // 1音の長さ（安定性のため少し長めに設定）
 const LOOP_GAP_SEC = 2.0;   // 送信ループ間の空き時間
 const BGM_VOLUME = 0.4;     // BGMの音量
 
