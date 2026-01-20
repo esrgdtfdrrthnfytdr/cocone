@@ -20,12 +20,12 @@ const LOOP_GAP_SEC = 2.0;
 const BGM_VOLUME = 0.4;
 
 
-// UI要素
+// UI要素 (class-select ではなく course-select に変更)
 const submitBtn = document.getElementById('submit-btn');
-// const courseSelect = document.getElementById('course-select');
+const courseSelect = document.getElementById('course-select');
 const errorMessage = document.getElementById('error-message');
 const volSlider = document.getElementById('signal-volume');
-// const volDisplay = document.getElementById('vol-display');
+const volDisplay = document.getElementById('vol-display');
 const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
 
 // スライダーの表示更新
