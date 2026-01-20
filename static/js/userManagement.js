@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         if (selectAllCheckbox) selectAllCheckbox.checked = false;
         
-        clearPageError(); // フィルタ変更時もエラークリア
+        clearPageError();
     }
     if (classFilter) classFilter.addEventListener('change', filterTable);
     if (yearFilter) yearFilter.addEventListener('change', filterTable);
@@ -65,6 +65,72 @@ document.addEventListener('DOMContentLoaded', function() {
         if (pageErrorArea) pageErrorArea.textContent = '';
     }
 
+    // =========================================
+    // カスタムモーダル (Alert / Confirm)
+    // =========================================
+    function customAlert(message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('alert-modal');
+            const msgElem = document.getElementById('alert-message');
+            const okBtn = document.getElementById('alert-ok-btn');
+            
+            if(!modal || !msgElem || !okBtn) {
+                alert(message); // fallback
+                resolve();
+                return;
+            }
+
+            msgElem.textContent = message;
+            modal.classList.add('active');
+            
+            const close = () => {
+                modal.classList.remove('active');
+                okBtn.removeEventListener('click', close);
+                resolve();
+            };
+            
+            // Enterキーなどでの誤操作防止のためフォーカス制御しても良いが今回は省略
+            okBtn.addEventListener('click', close);
+        });
+    }
+
+    function customConfirm(message, isDanger = false) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('confirm-modal');
+            const msgElem = document.getElementById('confirm-message');
+            const okBtn = document.getElementById('confirm-ok-btn');
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            
+            if(!modal || !msgElem || !okBtn || !cancelBtn) {
+                resolve(confirm(message)); // fallback
+                return;
+            }
+
+            msgElem.textContent = message;
+            // 危険な操作（削除など）の場合は赤色、それ以外は通常色などの切替も可能だが、
+            // 今回はHTML側でbtn-redを指定済み。必要に応じてclass操作を行う。
+            
+            modal.classList.add('active');
+
+            const handleOk = () => {
+                cleanup();
+                resolve(true);
+            };
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+            const cleanup = () => {
+                modal.classList.remove('active');
+                okBtn.removeEventListener('click', handleOk);
+                cancelBtn.removeEventListener('click', handleCancel);
+            };
+
+            okBtn.addEventListener('click', handleOk);
+            cancelBtn.addEventListener('click', handleCancel);
+        });
+    }
+
     // --- 削除ボタン ---
     const deleteBtn = document.getElementById('delete-btn');
     if (deleteBtn) {
@@ -81,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            if (!confirm(`${targetCount} 件のユーザーを削除しますか？`)) return;
+            if (!await customConfirm(`${targetCount} 件のユーザーを削除しますか？`)) return;
 
             try {
                 const studentNumbers = checkedBoxes.map(cb => cb.value);
@@ -93,14 +159,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await res.json();
 
                 if (data.status === 'success') {
-                    alert('削除しました');
+                    await customAlert('削除しました');
                     location.reload();
                 } else {
-                    alert('削除失敗: ' + (data.message || '不明なエラー'));
+                    await customAlert('削除失敗: ' + (data.message || '不明なエラー'));
                 }
             } catch (e) {
                 console.error(e);
-                alert('通信エラーが発生しました');
+                await customAlert('通信エラーが発生しました');
             }
         });
     }
@@ -148,7 +214,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.files.length === 0) return;
             const file = this.files[0];
             
-            if (!confirm(`ファイル "${file.name}" からユーザーを追加しますか？\n(形式: 学籍番号,氏名,メール,パスワード,クラス,出席番号)`)) {
+            const confirmed = await customConfirm(`ファイル "${file.name}" からユーザーを追加しますか？\n(形式: 学籍番号,氏名,メール,パスワード,クラス,出席番号)`);
+            if (!confirmed) {
                 this.value = '';
                 return;
             }
@@ -166,31 +233,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     data = await res.json();
                 } catch (err) {
-                    alert('エラー: サーバーからの応答が不正です');
+                    await customAlert('エラー: サーバーからの応答が不正です');
                     return;
                 }
 
                 if (data.status === 'success') {
-                    alert(data.message);
+                    await customAlert(data.message);
                     location.reload();
                 } else {
-                    // FastAPIのエラーレスポンス(detail)にも対応してメッセージを表示
                     let errorMsg = data.message;
                     if (!errorMsg && data.detail) {
                         if (typeof data.detail === 'string') {
                             errorMsg = data.detail;
                         } else if (Array.isArray(data.detail)) {
-                             // バリデーションエラーなどを簡易表示
                              errorMsg = "入力データ形式エラー: " + data.detail[0].msg;
                         } else {
                             errorMsg = "不明なエラー";
                         }
                     }
-                    alert('エラー: ' + (errorMsg || '不明なエラー'));
+                    await customAlert('エラー: ' + (errorMsg || '不明なエラー'));
                 }
             } catch (e) {
                 console.error(e);
-                alert('通信エラーが発生しました');
+                await customAlert('通信エラーが発生しました');
             }
             this.value = '';
         });
@@ -229,7 +294,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // 2. 正規表現チェック
-            // 学籍番号: s + 4桁(西暦) + 4桁(連番) = 9文字 (例: s20250001)
             const idRegex = /^s\d{8}$/;
             if (!idRegex.test(idVal)) {
                 inputStudentId.classList.add('input-error');
@@ -264,7 +328,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await res.json();
 
                 if (data.status === 'success') {
-                    // alertなしでリロード
+                    // カスタムモーダル表示後リロード
+                    // (ユーザー追加成功は即リロードする仕様のままですが、メッセージを出したい場合はここに追加可能)
                     location.reload();
                 } else {
                     modalErrorArea.textContent = data.message || '登録に失敗しました';
