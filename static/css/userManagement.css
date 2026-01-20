@@ -317,3 +317,16 @@ input[type="checkbox"] {
     }
     .modal-btn { width: 100%; max-width: 240px; }
 }
+
+/* =========================================
+   【追加修正】アラート/確認用モーダルのスタイル
+   既存のスタイルには影響を与えず、新しく追加したダイアログのみ背景色を適用します
+   ========================================= */
+#alert-modal .modal-content,
+#confirm-modal .modal-content {
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    padding: 30px;
+    color: var(--color-text);
+}
