@@ -3,7 +3,7 @@ import sys
 import random
 import datetime
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, List
 from collections import defaultdict
 import csv
 import io
@@ -43,6 +43,9 @@ class UpdateStatusRequest(BaseModel):
     period: int
     status: str
     note: Optional[str] = None
+
+class DeleteUsersRequest(BaseModel):
+    student_numbers: List[str]
 
 def get_teacher_classes(teacher_id: int):
     classes_list = []
@@ -209,18 +212,28 @@ async def attendance_status(request: Request): return render_page(request, "atte
 @app.get("/userManagement", response_class=HTMLResponse)
 async def user_management(request: Request):
     role = request.session.get("role")
-    if role != "teacher":
-        return RedirectResponse(url="/", status_code=303)
+    if role != "teacher": return RedirectResponse(url="/", status_code=303)
     
-    students_list = []
+    user_id = request.session.get("user_id")
+    classes = get_teacher_classes(user_id)
+    
+    students = []
+    years = set()
     try:
         with engine.connect() as conn:
             rows = conn.execute(text("SELECT student_number, email, name, homeroom_class, attendance_no FROM students ORDER BY homeroom_class, attendance_no")).fetchall()
-            students_list = rows
+            students = rows
+            for r in rows:
+                if r.student_number and len(r.student_number) >= 4:
+                    years.add(r.student_number[:4])
     except Exception as e:
-        print(f"Error fetching students: {e}")
-    
-    return render_page(request, "userManagement.html", {"students": students_list})
+        print(f"UserMgmt Error: {e}")
+
+    return render_page(request, "userManagement.html", {
+        "students": students,
+        "class_list": classes,
+        "years": sorted(list(years), reverse=True)
+    })
 
 @app.get("/passwordChange", response_class=HTMLResponse)
 async def password_change(request: Request): return render_page(request, "passwordChange.html")
@@ -306,6 +319,26 @@ async def update_status(req: UpdateStatusRequest):
 
     except Exception as e:
         print(f"❌ Update Error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/delete_users")
+async def delete_users(req: DeleteUsersRequest):
+    if not req.student_numbers:
+        return JSONResponse({"status": "error", "message": "No users selected"})
+    
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM attendance_results WHERE student_number = ANY(:ids)"),
+                {"ids": req.student_numbers}
+            )
+            conn.execute(
+                text("DELETE FROM students WHERE student_number = ANY(:ids)"),
+                {"ids": req.student_numbers}
+            )
+        return JSONResponse({"status": "success"})
+    except Exception as e:
+        print(f"Delete Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/download_csv")

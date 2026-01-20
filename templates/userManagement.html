@@ -20,8 +20,9 @@
                     <div class="select-wrapper mini-select">
                         <select id="class-filter">
                             <option value=""></option>
-                            <option value="R1A2">R1A2</option>
-                            <option value="R1A3">R1A3</option>
+                            {% for c in class_list %}
+                            <option value="{{ c.name }}">{{ c.name }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -30,8 +31,9 @@
                     <div class="select-wrapper mini-select">
                         <select id="year-filter">
                             <option value=""></option>
-                            <option value="2025">2025</option>
-                            <option value="2024">2024</option>
+                            {% for y in years %}
+                            <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -153,4 +155,28 @@
 
 {% block extra_js %}
     <script src="{{ url_for('static', path='/js/userManagement.js') }}"></script>
+    <script>
+        document.getElementById('delete-btn').addEventListener('click', async () => {
+            const selected = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
+            if (selected.length === 0) return alert('削除するユーザーを選択してください');
+            if (!confirm(selected.length + '人のユーザーを削除しますか？')) return;
+
+            try {
+                const res = await fetch('/api/delete_users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_numbers: selected})
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert('削除しました');
+                    location.reload();
+                } else {
+                    alert('削除失敗: ' + (data.message || '不明なエラー'));
+                }
+            } catch (e) {
+                alert('通信エラー');
+            }
+        });
+    </script>
 {% endblock %}
