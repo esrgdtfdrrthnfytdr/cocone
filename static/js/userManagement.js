@@ -114,6 +114,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalAddBtn = document.getElementById('modal-add-btn');
     const autoPassBtn = document.getElementById('auto-pass-btn');
     const modalErrorArea = document.getElementById('modal-error-msg');
+    const bulkAddBtn = document.querySelector('.bulk-add-btn');
+    const csvUploadInput = document.getElementById('csv-upload-input');
 
     // 入力フォーム要素
     const inputStudentId = document.getElementById('new-student-id');
@@ -133,6 +135,45 @@ document.addEventListener('DOMContentLoaded', function() {
     if (modalCancelBtn && addModal) {
         modalCancelBtn.addEventListener('click', function() {
             addModal.classList.remove('active');
+        });
+    }
+    
+    // 一括追加 (CSV)
+    if (bulkAddBtn && csvUploadInput) {
+        bulkAddBtn.addEventListener('click', function() {
+            csvUploadInput.click();
+        });
+
+        csvUploadInput.addEventListener('change', async function() {
+            if (this.files.length === 0) return;
+            const file = this.files[0];
+            
+            if (!confirm(`ファイル "${file.name}" からユーザーを追加しますか？\n(形式: 学籍番号,氏名,メール,パスワード,クラス,出席番号)`)) {
+                this.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/upload_users_csv', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('エラー: ' + data.message);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('通信エラーが発生しました');
+            }
+            this.value = '';
         });
     }
 
