@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // =========================================
-    // ユーザー追加モーダル制御 (正規表現チェック追加)
+    // ユーザー追加モーダル制御
     // =========================================
     const addBtn = document.getElementById('add-btn');
     const addModal = document.getElementById('add-user-modal');
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 追加実行
     if (modalAddBtn && addModal) {
-        modalAddBtn.addEventListener('click', function() {
+        modalAddBtn.addEventListener('click', async function() {
             clearModalError();
 
             // 値の取得
@@ -147,30 +147,34 @@ document.addEventListener('DOMContentLoaded', function() {
             const emailVal = inputEmail.value.trim();
             const passVal = inputPassword.value.trim();
 
+            const classSelect = document.getElementById('new-class');
+            const numberSelect = document.getElementById('new-number');
+            const classVal = classSelect ? classSelect.value : '';
+            const numberVal = numberSelect ? numberSelect.value : '';
+
             let hasEmptyError = false;
             let regexErrorMessage = '';
 
-            // 1. 未入力チェック (最優先)
+            // 1. 未入力チェック
             if (!idVal) { inputStudentId.classList.add('input-error'); hasEmptyError = true; }
             if (!nameVal) { inputName.classList.add('input-error'); hasEmptyError = true; }
             if (!emailVal) { inputEmail.classList.add('input-error'); hasEmptyError = true; }
             if (!passVal) { inputPassword.classList.add('input-error'); hasEmptyError = true; }
+            if (!classVal) { if(classSelect) classSelect.classList.add('input-error'); hasEmptyError = true; }
+            if (!numberVal) { if(numberSelect) numberSelect.classList.add('input-error'); hasEmptyError = true; }
 
             if (hasEmptyError) {
                 modalErrorArea.textContent = '※ 必須項目を入力してください';
                 return;
             }
 
-            // 2. 正規表現チェック (入力がある場合のみ)
-            
-            // 学籍番号: 8桁の半角数字 (^\d{8}$)
+            // 2. 正規表現チェック
             const idRegex = /^\d{8}$/;
             if (!idRegex.test(idVal)) {
                 inputStudentId.classList.add('input-error');
                 regexErrorMessage = '※ 学籍番号は8桁の半角数字で入力してください';
             }
             
-            // メールアドレス: 簡易的な形式チェック (例: 文字@文字.文字)
             const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
             if (!emailRegex.test(emailVal) && !regexErrorMessage) {
                 inputEmail.classList.add('input-error');
@@ -182,9 +186,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // 成功時
-            alert(`${nameVal} を追加しました。\n(デモ機能)`);
-            addModal.classList.remove('active');
+            // API送信
+            try {
+                const res = await fetch('/api/add_user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        student_number: idVal,
+                        name: nameVal,
+                        email: emailVal,
+                        password: passVal,
+                        class_name: classVal,
+                        attendance_no: parseInt(numberVal)
+                    })
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    alert(`${nameVal} を追加しました`);
+                    location.reload();
+                } else {
+                    modalErrorArea.textContent = data.message || '登録に失敗しました';
+                }
+            } catch (e) {
+                console.error(e);
+                modalErrorArea.textContent = '通信エラーが発生しました';
+            }
         });
     }
 
@@ -212,6 +239,10 @@ document.addEventListener('DOMContentLoaded', function() {
         modalInputs.forEach(input => {
             if(input) input.classList.remove('input-error');
         });
+        const classSelect = document.getElementById('new-class');
+        if (classSelect) classSelect.classList.remove('input-error');
+        const numberSelect = document.getElementById('new-number');
+        if (numberSelect) numberSelect.classList.remove('input-error');
     }
     function clearInputs() {
         modalInputs.forEach(input => { if(input) input.value = ''; });

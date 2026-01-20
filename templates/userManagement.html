@@ -40,8 +40,8 @@
             </div>
 
             <div class="actions">
-                <button id="delete-btn" class="action-btn btn-red">削除</button>
                 <button id="add-btn" class="action-btn btn-green">追加</button>
+                <button id="delete-btn" class="action-btn btn-red">削除</button>
             </div>
         </div>
 
@@ -91,6 +91,9 @@
                                 <select id="new-year">
                                     <option value="2025">2025</option>
                                     <option value="2024">2024</option>
+                                    {% for y in years %}
+                                    <option value="{{ y }}">{{ y }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -98,8 +101,9 @@
                             <label>クラス :</label>
                             <div class="select-wrapper modal-select">
                                 <select id="new-class">
-                                    <option value="R1A2">R1A2</option>
-                                    <option value="R1A3">R1A3</option>
+                                    {% for c in class_list %}
+                                    <option value="{{ c.name }}">{{ c.name }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -107,8 +111,9 @@
                             <label>出席番号 :</label>
                             <div class="select-wrapper modal-select">
                                 <select id="new-number">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
+                                    {% for i in range(1, 51) %}
+                                    <option value="{{ i }}">{{ i }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -146,8 +151,8 @@
             </div>
 
             <div class="modal-btn-area">
-                <button id="modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
                 <button id="modal-add-btn" class="modal-btn save-btn">追加</button>
+                <button id="modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
             </div>
         </div>
     </div>
