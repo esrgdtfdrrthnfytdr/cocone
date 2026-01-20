@@ -3,10 +3,6 @@ let isListening = false;
 let detectedBits = "";
 let state = "IDLE";
 
-// 定数定義 (iPhoneでも拾いやすい16kHz〜19kHz帯を使用)
-const FREQ_START_MIN = 18500;
-const FREQ_START_MAX = 19500;
-
 // UI要素
 const registerBtn = document.getElementById('register-btn');
 const statusMsg = document.getElementById('status-msg');
