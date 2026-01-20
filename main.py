@@ -116,9 +116,24 @@ async def roll_call(request: Request):
     classes = get_teacher_classes(user_id)
     return render_page(request, "rollCall.html", {"classes": classes})
 
+#テスト用ページのパス
+@app.get("/test_teacher", response_class=HTMLResponse)
+async def test_teacher(request: Request):
+    role = request.session.get("role")
+    user_id = request.session.get("user_id")
+    if role != "teacher": return RedirectResponse(url="/", status_code=303)
+    classes = get_teacher_classes(user_id)
+    return render_page(request, "test_teacher.html", {"classes": classes})
+
+
 @app.get("/register", response_class=HTMLResponse)
 async def register(request: Request):
     return render_page(request, "register.html")
+
+@app.get("/student", response_class=HTMLResponse)
+async def register(request: Request):
+    return render_page(request, "test_student.html")
+
 
 @app.get("/attendanceFilter", response_class=HTMLResponse)
 async def attendance_filter(request: Request):
