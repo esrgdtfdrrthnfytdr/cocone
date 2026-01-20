@@ -231,7 +231,36 @@ async def attendance_result(request: Request, class_name: Optional[str]=None, st
 async def attendance_status(request: Request): return render_page(request, "attendanceStatus.html")
 
 @app.get("/userManagement", response_class=HTMLResponse)
-async def user_management(request: Request): return render_page(request, "userManagement.html")
+async def user_management(request: Request):
+    role = request.session.get("role")
+    if role != "teacher": return RedirectResponse(url="/", status_code=303)
+    
+    user_id = request.session.get("user_id")
+    classes = get_teacher_classes(user_id)
+    
+    students = []
+    years = set()
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT student_number, email, name, homeroom_class, attendance_no FROM students ORDER BY homeroom_class, attendance_no")).fetchall()
+            students = rows
+            for r in rows:
+                val = r.student_number
+                if val:
+                    # s20250001 -> 2025 (4 digits)
+                    if val.startswith('s') and len(val) >= 5:
+                        years.add(val[1:5])
+                    # 20224055 -> 2022 (4 digits)
+                    elif len(val) >= 4:
+                        years.add(val[:4])
+    except Exception as e:
+        print(f"UserMgmt Error: {e}")
+
+    return render_page(request, "userManagement.html", {
+        "students": students,
+        "class_list": classes,
+        "years": sorted(list(years), reverse=True)
+    })
 
 @app.get("/passwordChange", response_class=HTMLResponse)
 async def password_change(request: Request): return render_page(request, "passwordChange.html")

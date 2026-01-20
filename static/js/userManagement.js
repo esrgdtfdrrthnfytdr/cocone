@@ -169,10 +169,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // 2. 正規表現チェック
-            const idRegex = /^\d{8}$/;
+            // 学籍番号: s + 4桁(西暦) + 4桁(連番) = 9文字 (例: s20250001)
+            const idRegex = /^s\d{8}$/;
             if (!idRegex.test(idVal)) {
                 inputStudentId.classList.add('input-error');
-                regexErrorMessage = '※ 学籍番号は8桁の半角数字で入力してください';
+                regexErrorMessage = '※ 学籍番号は"s"で始まる半角数字8桁(計9文字)で入力してください (例: s20250001)';
             }
             
             const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
