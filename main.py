@@ -232,8 +232,14 @@ async def user_management(request: Request):
             rows = conn.execute(text("SELECT student_number, email, name, homeroom_class, attendance_no FROM students ORDER BY homeroom_class, attendance_no")).fetchall()
             students = rows
             for r in rows:
-                if r.student_number and len(r.student_number) >= 4:
-                    years.add(r.student_number[:4])
+                val = r.student_number
+                if val:
+                    # s20250001 -> 2025 (4 digits)
+                    if val.startswith('s') and len(val) >= 5:
+                        years.add(val[1:5])
+                    # 20224055 -> 2022 (4 digits)
+                    elif len(val) >= 4:
+                        years.add(val[:4])
     except Exception as e:
         print(f"UserMgmt Error: {e}")
 
