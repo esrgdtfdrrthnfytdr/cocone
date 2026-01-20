@@ -7,10 +7,10 @@ let state = "IDLE";
 let dynamicThreshold = 30;
 
 // 周波数設定（test_teacher.jsと完全一致）
-// 範囲を少し広げて、多少のズレでも「0」を拾えるように改良
+// 19000Hz以上を使用
 const FREQ_MARKER_MIN = 18800; const FREQ_MARKER_MAX = 19200; // Marker: 19000
-const FREQ_BIT_0_MIN  = 19150; const FREQ_BIT_0_MAX  = 19450; // Bit 0: 19300 (広め)
-const FREQ_BIT_1_MIN  = 19550; const FREQ_BIT_1_MAX  = 19850; // Bit 1: 19700 (広め)
+const FREQ_BIT_0_MIN  = 19150; const FREQ_BIT_0_MAX  = 19450; // Bit 0: 19300
+const FREQ_BIT_1_MIN  = 19550; const FREQ_BIT_1_MAX  = 19850; // Bit 1: 19700
 
 const registerBtn = document.getElementById('register-btn');
 const statusMsg = document.getElementById('status-msg');
@@ -53,7 +53,7 @@ async function startMic() {
     const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.1; 
+    analyser.smoothingTimeConstant = 0.1; // 反応速度重視
 
     const filter = audioCtx.createBiquadFilter();
     filter.type = "highpass";
@@ -66,7 +66,7 @@ async function startMic() {
     setTimeout(() => {
         analyser.getByteFrequencyData(dataArray);
         const avgNoise = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        dynamicThreshold = Math.max(10, avgNoise + 8); // 感度MAX
+        dynamicThreshold = Math.max(10, avgNoise + 8); // 感度高め
         console.log("Calibration complete. Threshold:", dynamicThreshold);
         
         isListening = true;
@@ -109,13 +109,18 @@ function updateLoop() {
 }
 
 function startReceivingSequence() {
+    // 二重起動防止
+    if (state !== "IDLE") return;
     state = "RECEIVING"; 
-    detectedBits = "";
+    
+    // ★ここが修正点：前のデータを確実に消去する
+    detectedBits = ""; 
     let bitCount = 0;
+    if(debugBits) debugBits.innerText = "";
 
-    // ★修正ポイント：待ち時間を1.5秒に延長
-    // スタート合図(1.0秒) ＋ 予備時間(0.5秒) ＝ 1.5秒待ってから読み始める
-    // これで確実に「1ビット目の真ん中」を捉えます
+    // ★ここが修正点：待ち時間を「1.5秒」にする
+    // Start(1.0s) + Buffer(0.5s) = 1.5s
+    // これで前の音を絶対に拾わず、Bit1の真ん中を狙い撃ちします
     const INITIAL_WAIT = 1500; 
 
     const readBit = () => {
@@ -144,7 +149,7 @@ function startReceivingSequence() {
                 const count0 = samples.filter(s => s === "0").length;
                 
                 let finalBit = "x";
-                // 1回でも検知できれば採用（高感度）
+                // 救済措置：1回でも検知できれば採用
                 if (count1 === 0 && count0 === 0) {
                     finalBit = "x";
                 } else if (count1 >= count0) {
@@ -159,6 +164,7 @@ function startReceivingSequence() {
                 if (debugBits) debugBits.innerText = detectedBits; 
 
                 if (bitCount < 4) {
+                    // 次のビットまで待機
                     // 1ビット1.0秒 - 測定0.4秒 = 残り0.6秒待機
                     setTimeout(readBit, 600); 
                 } else {
@@ -174,11 +180,17 @@ function startReceivingSequence() {
 
 async function finishReceiving() {
     console.log("Final Result:", detectedBits);
-    const val = parseInt(detectedBits, 2);
-
-    if (detectedBits.includes("x") || isNaN(val)) {
-        if(statusMsg) statusMsg.innerText = "再試行してください";
+    
+    // xが含まれていたら即失敗にする
+    if (detectedBits.includes("x")) {
+        if(statusMsg) statusMsg.innerText = "受信失敗: 再試行します";
         if(debugBits) debugBits.innerHTML += " <span style='color:red'>[失敗]</span>";
+        setTimeout(() => { resetUI(); }, 2000);
+        return;
+    }
+
+    const val = parseInt(detectedBits, 2);
+    if (isNaN(val)) {
         setTimeout(() => { resetUI(); }, 2000);
         return;
     }
@@ -194,8 +206,9 @@ async function finishReceiving() {
         if (result.status === "success") {
             if (modal) modal.classList.add('active');
             if(statusMsg) statusMsg.innerText = "登録完了";
+            // 成功したら監視を止める（stateをIDLEに戻さない）
         } else {
-            alert(`コード不一致: ${val} (正: ${result.correct_otp || '?'})`);
+            alert(`コード不一致: 受信${val} (正解: ${result.correct_otp || '?'})`);
             resetUI();
         }
     } catch(e) {
