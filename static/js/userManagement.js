@@ -161,13 +161,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     method: 'POST',
                     body: formData
                 });
-                const data = await res.json();
+                
+                let data;
+                try {
+                    data = await res.json();
+                } catch (err) {
+                    alert('エラー: サーバーからの応答が不正です');
+                    return;
+                }
 
                 if (data.status === 'success') {
                     alert(data.message);
                     location.reload();
                 } else {
-                    alert('エラー: ' + data.message);
+                    // FastAPIのエラーレスポンス(detail)にも対応してメッセージを表示
+                    let errorMsg = data.message;
+                    if (!errorMsg && data.detail) {
+                        if (typeof data.detail === 'string') {
+                            errorMsg = data.detail;
+                        } else if (Array.isArray(data.detail)) {
+                             // バリデーションエラーなどを簡易表示
+                             errorMsg = "入力データ形式エラー: " + data.detail[0].msg;
+                        } else {
+                            errorMsg = "不明なエラー";
+                        }
+                    }
+                    alert('エラー: ' + (errorMsg || '不明なエラー'));
                 }
             } catch (e) {
                 console.error(e);
