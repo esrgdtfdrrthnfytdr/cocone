@@ -47,6 +47,14 @@ class UpdateStatusRequest(BaseModel):
 class DeleteUsersRequest(BaseModel):
     student_numbers: List[str]
 
+class AddUserRequest(BaseModel):
+    student_number: str
+    name: str
+    email: str
+    password: str
+    class_name: str
+    attendance_no: int
+
 def get_teacher_classes(teacher_id: int):
     classes_list = []
     try:
@@ -339,6 +347,27 @@ async def delete_users(req: DeleteUsersRequest):
         return JSONResponse({"status": "success"})
     except Exception as e:
         print(f"Delete Error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/add_user")
+async def add_user(req: AddUserRequest):
+    try:
+        with engine.begin() as conn:
+            exist = conn.execute(text("SELECT 1 FROM students WHERE student_number = :id"), {"id": req.student_number}).fetchone()
+            if exist:
+                return JSONResponse({"status": "error", "message": "この学籍番号は既に登録されています"})
+            
+            exist_email = conn.execute(text("SELECT 1 FROM students WHERE email = :email"), {"email": req.email}).fetchone()
+            if exist_email:
+                return JSONResponse({"status": "error", "message": "このメールアドレスは既に登録されています"})
+
+            conn.execute(
+                text("INSERT INTO students (student_number, name, email, password_hash, homeroom_class, attendance_no) VALUES (:id, :name, :email, :pass, :cls, :no)"),
+                {"id": req.student_number, "name": req.name, "email": req.email, "pass": req.password, "cls": req.class_name, "no": req.attendance_no}
+            )
+        return JSONResponse({"status": "success"})
+    except Exception as e:
+        print(f"Add User Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/download_csv")
