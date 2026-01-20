@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 削除ボタン ---
     const deleteBtn = document.getElementById('delete-btn');
     if (deleteBtn) {
-        deleteBtn.addEventListener('click', function() {
+        deleteBtn.addEventListener('click', async function() {
             clearPageError();
 
             const checkedBoxes = Array.from(document.querySelectorAll('.user-checkbox:checked'))
@@ -81,12 +81,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            if (confirm(`${targetCount} 件のユーザーを削除しますか？\n(デモ機能)`)) {
-                checkedBoxes.forEach(cb => {
-                    cb.closest('tr').remove();
+            if (!confirm(`${targetCount} 件のユーザーを削除しますか？`)) return;
+
+            try {
+                const studentNumbers = checkedBoxes.map(cb => cb.value);
+                const res = await fetch('/api/delete_users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_numbers: studentNumbers})
                 });
-                alert('削除しました。(デモ)');
-                if (selectAllCheckbox) selectAllCheckbox.checked = false;
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    alert('削除しました');
+                    location.reload();
+                } else {
+                    alert('削除失敗: ' + (data.message || '不明なエラー'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('通信エラーが発生しました');
             }
         });
     }
@@ -157,11 +171,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // メールアドレス: 簡易的な形式チェック (例: 文字@文字.文字)
-            // より厳密なRegex: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
             const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
             if (!emailRegex.test(emailVal) && !regexErrorMessage) {
                 inputEmail.classList.add('input-error');
-                // 学籍番号エラーがなければメールエラーを表示
                 regexErrorMessage = '※ 正しいメールアドレスの形式で入力してください';
             }
 
