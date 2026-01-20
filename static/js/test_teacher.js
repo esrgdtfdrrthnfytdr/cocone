@@ -1,165 +1,215 @@
-// static/js/test_teacher.js
+// static/js/test_student.js
 
-let audioCtx;
-let bgmBuffer = null;
-let bgmSource = null;
-let bgmGainNode = null;
-let osc = null;
-let isScanning = false;
-let nextSignalTimer = null;
-let isBgmOn = true;
+let audioCtx, analyser, dataArray;
+let isListening = false;
+let detectedBits = "";
+let state = "IDLE";
+let dynamicThreshold = 30;
 
-// --- 設定 ---
-const BGM_URL = '/static/sounds/bgm.wav';
+// 周波数設定（test_teacher.jsと完全一致）
+// 範囲を広めにとって、多少のズレも許容します
+const FREQ_MARKER_MIN = 18800; const FREQ_MARKER_MAX = 19200; // Marker: 19000
+const FREQ_BIT_0_MIN  = 19150; const FREQ_BIT_0_MAX  = 19450; // Bit 0: 19300
+const FREQ_BIT_1_MIN  = 19550; const FREQ_BIT_1_MAX  = 19850; // Bit 1: 19700
 
-// 周波数設定（test_student.jsと完全に一致させる）
-const FREQ_START = 19000; // スタート信号
-const FREQ_BIT_0 = 19300; // ビット0
-const FREQ_BIT_1 = 19700; // ビット1
+const registerBtn = document.getElementById('register-btn');
+const statusMsg = document.getElementById('status-msg');
+const modal = document.getElementById('completion-modal');
+const modalCloseBtn = document.getElementById('modal-close-btn');
+const debugFreq = document.getElementById('debug-freq');
+const debugBits = document.getElementById('debug-bits');
 
-// ★超安全策：1ビットの長さを「1.0秒」にする
-const BIT_DURATION = 1.0; 
-const LOOP_GAP_SEC = 3.0;   // 次の送信までの休憩も長めに
-const BGM_VOLUME = 0.4;
-
-// --- UI要素 ---
-const submitBtn = document.getElementById('submit-btn');
-const classSelect = document.getElementById('class-select'); 
-const errorMessage = document.getElementById('error-message');
-const volSlider = document.getElementById('signal-volume');
-const volDisplay = document.getElementById('vol-display');
-const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
-
-if (volSlider && volDisplay) {
-    volSlider.addEventListener('input', (e) => {
-        volDisplay.textContent = e.target.value;
+if (registerBtn) {
+    registerBtn.addEventListener('click', async () => {
+        if (registerBtn.classList.contains('is-processing')) return;
+        try { await startMic(); } catch (e) { alert("マイクエラー: " + e); }
+    });
+}
+if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', () => {
+        if(modal) modal.classList.remove('active');
+        resetUI();
     });
 }
 
-if (bgmToggleBtn) {
-    bgmToggleBtn.addEventListener('click', () => {
-        isBgmOn = !isBgmOn;
-        if (isBgmOn) {
-            bgmToggleBtn.textContent = "🎵 BGM: ON";
-            bgmToggleBtn.style.backgroundColor = "#63D2B0";
-        } else {
-            bgmToggleBtn.textContent = "🔇 BGM: OFF";
-            bgmToggleBtn.style.backgroundColor = "#95A5A6";
-        }
-        if (bgmGainNode) {
-            bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-        }
+async function startMic() {
+    registerBtn.textContent = '信号を探しています...';
+    registerBtn.classList.add('is-processing');
+    if(statusMsg) statusMsg.innerText = "マイク起動中...";
+    if(debugBits) debugBits.innerText = ""; 
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
+    const source = audioCtx.createBufferSource();
+    source.buffer = emptyBuffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     });
+    
+    const mediaSource = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.1; 
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 17000; 
+
+    mediaSource.connect(filter);
+    filter.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    setTimeout(() => {
+        analyser.getByteFrequencyData(dataArray);
+        const avgNoise = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        // しきい値を低めに設定して感度を確保
+        dynamicThreshold = Math.max(10, avgNoise + 8); 
+        console.log("Calibration complete. Threshold:", dynamicThreshold);
+        
+        isListening = true;
+        state = "IDLE";
+        updateLoop();
+    }, 500);
 }
 
-window.addEventListener('load', async () => {
-    try {
-        window.AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-        const response = await fetch(BGM_URL);
-        const arrayBuffer = await response.arrayBuffer();
-        bgmBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        console.log("BGM Ready");
-    } catch (e) { console.error(e); }
-});
+function getDominantFrequency() {
+    analyser.getByteFrequencyData(dataArray);
+    let maxVal = 0;
+    let maxIndex = 0;
+    const nyquist = audioCtx.sampleRate / 2;
+    const minIndex = Math.floor(18000 * dataArray.length / nyquist); 
 
-if (submitBtn) {
-    submitBtn.addEventListener('click', async () => {
-        if (isScanning) { stopSound(); return; }
-        if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
-        if(errorMessage) { errorMessage.textContent = ''; errorMessage.classList.remove('show'); }
-
-        try {
-            const res = await fetch('/api/generate_otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}) 
-            });
-            if (!res.ok) throw new Error("Server Error");
-            const data = await res.json();
-            startScanningUI();
-            playMixedSoundLoop(data.otp_binary);
-        } catch(e) {
-            console.error(e);
-            alert("通信エラー");
-            stopSound();
+    for (let i = minIndex; i < dataArray.length; i++) {
+        if (dataArray[i] > maxVal) {
+            maxVal = dataArray[i];
+            maxIndex = i;
         }
-    });
-}
-
-function startScanningUI() {
-    isScanning = true;
-    submitBtn.textContent = '停止する';
-    submitBtn.classList.add('is-processing');
-    if(classSelect) classSelect.disabled = true;
-}
-
-function stopScanningUI() {
-    isScanning = false;
-    submitBtn.textContent = '出席確認';
-    submitBtn.classList.remove('is-processing');
-    if(classSelect) classSelect.disabled = false;
-}
-
-function playMixedSoundLoop(binaryStr) {
-    if (!audioCtx) return;
-    if (bgmBuffer) {
-        bgmSource = audioCtx.createBufferSource();
-        bgmSource.buffer = bgmBuffer;
-        bgmSource.loop = true;
-        bgmGainNode = audioCtx.createGain();
-        bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-        bgmSource.connect(bgmGainNode);
-        bgmGainNode.connect(audioCtx.destination);
-        bgmSource.start(0);
     }
-    playSignalRecursive(binaryStr);
+    if (maxVal < dynamicThreshold) return 0; 
+    return maxIndex * nyquist / dataArray.length;
 }
 
-function playSignalRecursive(binaryStr) {
-    if (!isScanning || !audioCtx) return;
+function updateLoop() {
+    if (!isListening) return;
+    
+    if (state === "IDLE") {
+        const freq = getDominantFrequency();
+        if (debugFreq) debugFreq.innerText = freq > 0 ? Math.round(freq) + " Hz" : "---";
 
-    osc = audioCtx.createOscillator();
-    const oscGain = audioCtx.createGain();
-    const currentVol = volSlider ? parseFloat(volSlider.value) : 0.1;
-    oscGain.gain.value = currentVol;
-
-    osc.connect(oscGain);
-    oscGain.connect(audioCtx.destination);
-
-    const startTime = audioCtx.currentTime;
-
-    // 1. スタートマーカー (19000Hz)
-    osc.frequency.setValueAtTime(FREQ_START, startTime);
-
-    // 2. データビット (19300Hz / 19700Hz)
-    for (let i = 0; i < binaryStr.length; i++) {
-        const bit = binaryStr[i];
-        const time = startTime + BIT_DURATION + (i * BIT_DURATION);
-        osc.frequency.setValueAtTime((bit === '1' ? FREQ_BIT_1 : FREQ_BIT_0), time);
-    }
-
-    const totalDuration = BIT_DURATION + (binaryStr.length * BIT_DURATION);
-    const endTime = startTime + totalDuration;
-
-    osc.start(startTime);
-    osc.stop(endTime);
-
-    osc.onended = () => {
-        osc = null;
-        if (isScanning) {
-            nextSignalTimer = setTimeout(() => {
-                playSignalRecursive(binaryStr);
-            }, LOOP_GAP_SEC * 1000);
+        if (freq > FREQ_MARKER_MIN && freq < FREQ_MARKER_MAX) {
+            console.log("🚀 START SIGNAL DETECTED");
+            if(statusMsg) statusMsg.innerText = "受信開始...";
+            startReceivingSequence();
         }
+    }
+    requestAnimationFrame(updateLoop);
+}
+
+function startReceivingSequence() {
+    state = "RECEIVING"; 
+    detectedBits = "";
+    let bitCount = 0;
+
+    // ★ここが修正点★
+    // スタート合図検知後、1.1秒待ってから読み始めます。
+    // これで「Bit 1」のちょうど真ん中（1.0s〜2.0sの中間）を狙い撃ちします。
+    const INITIAL_WAIT = 1100; 
+
+    const readBit = () => {
+        let samples = [];      
+        let sampleCount = 0;   
+        const maxSamples = 20; 
+        const sampleInterval = 20; // 20ms * 20回 = 400ms測定
+
+        const takeSample = () => {
+            const freq = getDominantFrequency();
+            let bit = null;
+            
+            if (freq > FREQ_BIT_1_MIN && freq < FREQ_BIT_1_MAX) bit = "1";      
+            else if (freq > FREQ_BIT_0_MIN && freq < FREQ_BIT_0_MAX) bit = "0"; 
+            
+            if (bit !== null) samples.push(bit);
+            
+            // デバッグ表示：現在のHzと判定結果
+            if (debugFreq) debugFreq.innerText = `Scan: ${Math.round(freq)} Hz -> ${bit || '?'}`;
+
+            sampleCount++;
+
+            if (sampleCount < maxSamples) {
+                setTimeout(takeSample, sampleInterval);
+            } else {
+                const count1 = samples.filter(s => s === "1").length;
+                const count0 = samples.filter(s => s === "0").length;
+                
+                let finalBit = "x";
+                // 救済措置：1回でも検知できれば採用
+                if (count1 === 0 && count0 === 0) {
+                    finalBit = "x";
+                } else if (count1 >= count0) {
+                    finalBit = "1";
+                } else {
+                    finalBit = "0";
+                }
+                
+                detectedBits += finalBit;
+                bitCount++;
+                console.log(`Bit ${bitCount}: ${finalBit} (1:${count1}, 0:${count0})`);
+                if (debugBits) debugBits.innerText = detectedBits; 
+
+                if (bitCount < 4) {
+                    // 次のビットまで 0.6秒待機（1.0s - 0.4s）
+                    setTimeout(readBit, 600); 
+                } else {
+                    finishReceiving();
+                }
+            }
+        };
+        takeSample();
     };
+
+    setTimeout(readBit, INITIAL_WAIT); 
 }
 
-function stopSound() {
-    isScanning = false;
-    if (nextSignalTimer) { clearTimeout(nextSignalTimer); nextSignalTimer = null; }
-    if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
-    if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
-    bgmGainNode = null;
-    stopScanningUI();
+async function finishReceiving() {
+    console.log("Final Result:", detectedBits);
+    const val = parseInt(detectedBits, 2);
+
+    if (detectedBits.includes("x") || isNaN(val)) {
+        if(statusMsg) statusMsg.innerText = "再試行してください";
+        if(debugBits) debugBits.innerHTML += " <span style='color:red'>[失敗]</span>";
+        setTimeout(() => { resetUI(); }, 2000);
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/check_attend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp_value: val })
+        });
+        const result = await res.json();
+
+        if (result.status === "success") {
+            if (modal) modal.classList.add('active');
+            if(statusMsg) statusMsg.innerText = "登録完了";
+        } else {
+            alert(`コード不一致: ${val} (正: ${result.correct_otp || '?'})`);
+            resetUI();
+        }
+    } catch(e) {
+        alert("通信エラー");
+        resetUI();
+    }
+}
+
+function resetUI() {
+    registerBtn.textContent = '出席登録';
+    registerBtn.classList.remove('is-processing');
+    if(statusMsg) statusMsg.innerText = "";
+    state = "IDLE";
+    isListening = true; 
 }
