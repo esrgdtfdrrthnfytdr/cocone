@@ -80,7 +80,6 @@
             <h2>ユーザー追加</h2>
             
             <button class="bulk-add-btn">一括追加</button>
-            <!-- CSVアップロード用隠しinput -->
             <input type="file" id="csv-upload-input" accept=".csv" style="display:none;">
 
             <div class="modal-body">
@@ -153,6 +152,27 @@
             <div class="modal-btn-area">
                 <button id="modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
                 <button id="modal-add-btn" class="modal-btn save-btn">追加</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 id="alert-title" style="margin-bottom: 20px;">通知</h3>
+            <p id="alert-message" style="margin-bottom: 30px; white-space: pre-wrap;"></p>
+            <div class="modal-btn-area" style="justify-content: center;">
+                <button id="alert-ok-btn" class="modal-btn save-btn" style="min-width: 100px;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 id="confirm-title" style="margin-bottom: 20px;">確認</h3>
+            <p id="confirm-message" style="margin-bottom: 30px; white-space: pre-wrap;"></p>
+            <div class="modal-btn-area" style="justify-content: center; gap: 20px;">
+                <button id="confirm-cancel-btn" class="modal-btn cancel-btn" style="min-width: 100px;">キャンセル</button>
+                <button id="confirm-ok-btn" class="modal-btn btn-red" style="min-width: 100px;">OK</button>
             </div>
         </div>
     </div>
