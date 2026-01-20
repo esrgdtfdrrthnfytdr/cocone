@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>出席登録｜cocone</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="/static/css/student.css">
+</head>
+<body>
+    <header>
+        <button id="hamburger-btn" class="hamburger-btn">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="logo-container">
+            <img src="/static/image/cocone_white_logo.png" alt="cocone">
+        </div>
+        <nav class="pc-nav">
+            <a href="/register">出席登録</a>
+            <a href="/rollCall">出欠席絞り込み</a>
+            <a href="#">ユーザー登録</a>
+            <a href="#">ログアウト</a>
+        </nav>
+    </header>
+
+    <div id="mobile-menu" class="mobile-menu">
+        <div class="menu-background">
+            <div class="menu-header">
+                <button id="close-btn" class="close-btn">×</button>
+                <img src="/static/image/cocone_white_logo.png" alt="cocone" class="menu-logo">
+            </div>
+            <nav class="mobile-nav-links">
+                <a href="/register">出席登録</a>
+                <a href="/rollCall">出欠席絞り込み</a>
+                <a href="#">ユーザー登録</a>
+                <a href="#">ログアウト</a>
+            </nav>
+        </div>
+    </div>
+
+    <main>
+        <h1>出席登録</h1>
+        <button id="register-btn" class="circle-button">出席登録</button>
+        <p id="status-msg" style="margin-top:20px; font-weight:bold; height: 24px;"></p>
+
+        <div id="signal-monitor" style="margin-top: 20px; padding: 15px; background: #eee; border-radius: 8px; font-family: monospace; width: 90%; max-width: 400px; text-align: left;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">現在の周波数:</div>
+            <div id="debug-freq" style="font-size: 24px; font-weight: bold; color: #333;">0 Hz</div>
+            <hr style="margin: 10px 0; border: 0; border-top: 1px solid #ccc;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">受信データ履歴:</div>
+            <div id="debug-bits" style="font-size: 16px; letter-spacing: 3px; color: #005bac; min-height: 20px;">...</div>
+        </div>
+        </main>
+
+    <div id="completion-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>出席登録が完了しました！</h2>
+            <div class="attendance-details">
+                <div class="detail-row">
+                    <span class="detail-label">出席番号</span>
+                    <span class="detail-value">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">氏名</span>
+                    <span class="detail-value">ゲスト</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">ステータス</span>
+                    <span class="detail-value">出席済み</span>
+                </div>
+            </div>
+            <button id="modal-close-btn" class="modal-close-btn">閉じる</button>
+        </div>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/test_student.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
