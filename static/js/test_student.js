@@ -7,9 +7,10 @@ let state = "IDLE";
 let dynamicThreshold = 30;
 
 // 周波数設定（test_teacher.jsと完全一致）
-const FREQ_MARKER_MIN = 18900; const FREQ_MARKER_MAX = 19100; // Marker: 19000
-const FREQ_BIT_0_MIN  = 19200; const FREQ_BIT_0_MAX  = 19400; // Bit 0: 19300
-const FREQ_BIT_1_MIN  = 19600; const FREQ_BIT_1_MAX  = 19800; // Bit 1: 19700
+// 範囲を少し広げて、多少のズレでも「0」を拾えるように改良
+const FREQ_MARKER_MIN = 18800; const FREQ_MARKER_MAX = 19200; // Marker: 19000
+const FREQ_BIT_0_MIN  = 19150; const FREQ_BIT_0_MAX  = 19450; // Bit 0: 19300 (広め)
+const FREQ_BIT_1_MIN  = 19550; const FREQ_BIT_1_MAX  = 19850; // Bit 1: 19700 (広め)
 
 const registerBtn = document.getElementById('register-btn');
 const statusMsg = document.getElementById('status-msg');
@@ -38,7 +39,6 @@ async function startMic() {
     if(debugBits) debugBits.innerText = ""; 
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // iOSアンロック
     const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
     const source = audioCtx.createBufferSource();
     source.buffer = emptyBuffer;
@@ -53,21 +53,20 @@ async function startMic() {
     const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.1; // 反応速度最優先
+    analyser.smoothingTimeConstant = 0.1; 
 
     const filter = audioCtx.createBiquadFilter();
     filter.type = "highpass";
-    filter.frequency.value = 17000; // ノイズカット
+    filter.frequency.value = 17000; 
 
     mediaSource.connect(filter);
     filter.connect(analyser);
     dataArray = new Uint8Array(analyser.frequencyBinCount);
     
     setTimeout(() => {
-        // キャリブレーション（かなり感度高く設定）
         analyser.getByteFrequencyData(dataArray);
         const avgNoise = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        dynamicThreshold = Math.max(15, avgNoise + 10); 
+        dynamicThreshold = Math.max(10, avgNoise + 8); // 感度MAX
         console.log("Calibration complete. Threshold:", dynamicThreshold);
         
         isListening = true;
@@ -81,7 +80,7 @@ function getDominantFrequency() {
     let maxVal = 0;
     let maxIndex = 0;
     const nyquist = audioCtx.sampleRate / 2;
-    const minIndex = Math.floor(18000 * dataArray.length / nyquist); // 18kHz以上だけ見る
+    const minIndex = Math.floor(18000 * dataArray.length / nyquist); 
 
     for (let i = minIndex; i < dataArray.length; i++) {
         if (dataArray[i] > maxVal) {
@@ -96,50 +95,44 @@ function getDominantFrequency() {
 function updateLoop() {
     if (!isListening) return;
     
-    // IDLE状態（待ち受け中）のみここで監視する
     if (state === "IDLE") {
         const freq = getDominantFrequency();
         if (debugFreq) debugFreq.innerText = freq > 0 ? Math.round(freq) + " Hz" : "---";
 
-        // スタート信号検知
         if (freq > FREQ_MARKER_MIN && freq < FREQ_MARKER_MAX) {
             console.log("🚀 START SIGNAL DETECTED");
             if(statusMsg) statusMsg.innerText = "受信開始...";
             startReceivingSequence();
         }
     }
-    
     requestAnimationFrame(updateLoop);
 }
 
 function startReceivingSequence() {
-    state = "RECEIVING"; // 監視ループを止める
+    state = "RECEIVING"; 
     detectedBits = "";
     let bitCount = 0;
 
-    // ★ここが修正の肝★
-    // スタート信号(1.0s)を完全にやり過ごすため、検知してから 1.2秒 待つ
-    // これで絶対に前の音を拾わない
-    const INITIAL_WAIT = 1200; 
+    // ★修正ポイント：待ち時間を1.5秒に延長
+    // スタート合図(1.0秒) ＋ 予備時間(0.5秒) ＝ 1.5秒待ってから読み始める
+    // これで確実に「1ビット目の真ん中」を捉えます
+    const INITIAL_WAIT = 1500; 
 
     const readBit = () => {
         let samples = [];      
         let sampleCount = 0;   
-        const maxSamples = 20; // たくさん取る
-        const sampleInterval = 20; // 20ms間隔 (計400ms測定)
+        const maxSamples = 20; 
+        const sampleInterval = 20; // 20ms * 20回 = 400ms測定
 
-        // 測定ループ
         const takeSample = () => {
             const freq = getDominantFrequency();
             let bit = null;
             
-            // 範囲判定
             if (freq > FREQ_BIT_1_MIN && freq < FREQ_BIT_1_MAX) bit = "1";      
             else if (freq > FREQ_BIT_0_MIN && freq < FREQ_BIT_0_MAX) bit = "0"; 
             
             if (bit !== null) samples.push(bit);
             
-            // リアルタイムデバッグ表示
             if (debugFreq) debugFreq.innerText = `Scan: ${Math.round(freq)} Hz -> ${bit || '?'}`;
 
             sampleCount++;
@@ -147,13 +140,11 @@ function startReceivingSequence() {
             if (sampleCount < maxSamples) {
                 setTimeout(takeSample, sampleInterval);
             } else {
-                // 集計
                 const count1 = samples.filter(s => s === "1").length;
                 const count0 = samples.filter(s => s === "0").length;
                 
                 let finalBit = "x";
-                // ★判定条件：ノイズに勝つため、多い方を採用。同数なら1。
-                // 1回も検知できなければX
+                // 1回でも検知できれば採用（高感度）
                 if (count1 === 0 && count0 === 0) {
                     finalBit = "x";
                 } else if (count1 >= count0) {
@@ -168,9 +159,7 @@ function startReceivingSequence() {
                 if (debugBits) debugBits.innerText = detectedBits; 
 
                 if (bitCount < 4) {
-                    // 次のビットまで待機
-                    // 1ビット1.0秒 - 測定時間0.4秒 = 残り0.6秒
-                    // 余裕を見て 0.6秒 待つ
+                    // 1ビット1.0秒 - 測定0.4秒 = 残り0.6秒待機
                     setTimeout(readBit, 600); 
                 } else {
                     finishReceiving();
@@ -180,7 +169,6 @@ function startReceivingSequence() {
         takeSample();
     };
 
-    // 最初の待機
     setTimeout(readBit, INITIAL_WAIT); 
 }
 
@@ -191,7 +179,6 @@ async function finishReceiving() {
     if (detectedBits.includes("x") || isNaN(val)) {
         if(statusMsg) statusMsg.innerText = "再試行してください";
         if(debugBits) debugBits.innerHTML += " <span style='color:red'>[失敗]</span>";
-        // 少し待ってリセット
         setTimeout(() => { resetUI(); }, 2000);
         return;
     }
@@ -222,5 +209,5 @@ function resetUI() {
     registerBtn.classList.remove('is-processing');
     if(statusMsg) statusMsg.innerText = "";
     state = "IDLE";
-    isListening = true; // 監視再開
+    isListening = true; 
 }
