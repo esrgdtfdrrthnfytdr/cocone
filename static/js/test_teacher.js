@@ -1,52 +1,224 @@
-function startReceivingSequence() {
-    if (state !== "IDLE") return;
-    state = "RECEIVING";
-    detectedBits = "";
-    let bitCount = 0;
+// static/js/test_teacher.js
 
-    const readBit = () => {
-        let samples = [];      
-        let sampleCount = 0;   
-        const maxSamples = 15;      // サンプル数を増やして網を広げる
-        const sampleInterval = 25;  // 25ms間隔で超高速スキャン
+let audioCtx;
+let bgmBuffer = null;
+let bgmSource = null;
+let bgmGainNode = null;
+let osc = null;
+let isScanning = false;
+let nextSignalTimer = null;
+let isBgmOn = true;
 
-        const takeSample = () => {
-            const freq = getDominantFrequency();
-            let bit = null;
-            
-            // 周波数判定の幅をさらに広げる (±300Hz)
-            if (freq > 19200 && freq < 19800) bit = "1";      // 19500Hz付近
-            else if (freq > 18200 && freq < 18800) bit = "0"; // 18500Hz付近
-            
-            if (bit !== null) samples.push(bit);
-            sampleCount++;
+// --- 設定 ---
+const BGM_URL = '/static/sounds/bgm.wav';
 
-            if (sampleCount < maxSamples) {
-                setTimeout(takeSample, sampleInterval);
-            } else {
-                // 多数決ロジックの「超緩和」
-                const count1 = samples.filter(s => s === "1").length;
-                const count0 = samples.filter(s => s === "0").length;
-                
-                let finalBit = "x";
-                // 1回でも検知された方を優先。同数の場合は1とする。
-                if (count1 > 0 && count1 >= count0) finalBit = "1";
-                else if (count0 > 0) finalBit = "0";
-                
-                detectedBits += finalBit;
-                bitCount++;
-                console.log(`Bit ${bitCount}: ${finalBit} (1検知:${count1}, 0検知:${count0})`);
-                if (debugBits) debugBits.innerText = detectedBits; // リアルタイム更新
+// 周波数設定（test_student.jsの受信範囲に合わせて中心値を設定）
+const FREQ_START = 19000; // マーカー (受信範囲: 18800-19250)
+const FREQ_BIT_0 = 18500; // ビット0 (受信範囲: 18200-18800)
+const FREQ_BIT_1 = 19500; // ビット1 (受信範囲: 19200-19800)
 
-                if (bitCount < 4) {
-                    setTimeout(readBit, 50); // 次のビットへの遷移を速める
-                } else {
-                    finishReceiving();
-                }
-            }
-        };
-        takeSample();
+// 信号の長さ設定
+// 受信側の多数決処理（約400ms）に対して余裕を持たせるため 0.6秒 に設定
+const BIT_DURATION = 0.6;
+const LOOP_GAP_SEC = 2.0;   // ループ間の休憩時間
+const BGM_VOLUME = 0.4;     // BGMの音量
+
+// --- UI要素 ---
+const submitBtn = document.getElementById('submit-btn');
+// HTML側のIDが 'class-select' であることに注意
+const classSelect = document.getElementById('class-select'); 
+const errorMessage = document.getElementById('error-message');
+const volSlider = document.getElementById('signal-volume');
+const volDisplay = document.getElementById('vol-display');
+const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
+
+// 音量スライダーの表示更新
+if (volSlider && volDisplay) {
+    volSlider.addEventListener('input', (e) => {
+        volDisplay.textContent = e.target.value;
+    });
+}
+
+// BGM切り替えボタン
+if (bgmToggleBtn) {
+    bgmToggleBtn.addEventListener('click', () => {
+        isBgmOn = !isBgmOn;
+        if (isBgmOn) {
+            bgmToggleBtn.textContent = "🎵 BGM: ON";
+            bgmToggleBtn.style.backgroundColor = "#63D2B0";
+        } else {
+            bgmToggleBtn.textContent = "🔇 BGM: OFF";
+            bgmToggleBtn.style.backgroundColor = "#95A5A6";
+        }
+        if (bgmGainNode) {
+            bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
+        }
+    });
+}
+
+// 初期化：ページロード時にBGMを読み込む
+window.addEventListener('load', async () => {
+    try {
+        window.AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+
+        const response = await fetch(BGM_URL);
+        const arrayBuffer = await response.arrayBuffer();
+        bgmBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        console.log("BGM Ready");
+    } catch (e) {
+        console.error("BGM Load Error:", e);
+    }
+});
+
+// 出席確認ボタンクリック処理
+if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+        if (isScanning) {
+            stopSound();
+            return;
+        }
+
+        // ブラウザの自動再生制限解除
+        if (audioCtx && audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+
+        /* 必要に応じてクラス選択チェックを有効化してください
+        const selectedValue = classSelect ? classSelect.value : null;
+        if (!selectedValue) {
+             if(errorMessage) {
+                 errorMessage.textContent = 'クラスを選択してください';
+                 errorMessage.classList.add('show');
+             }
+             return;
+        }
+        */
+
+        if(errorMessage) {
+            errorMessage.textContent = '';
+            errorMessage.classList.remove('show');
+        }
+
+        try {
+            // APIからOTP取得
+            const res = await fetch('/api/generate_otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}) // 必要なら { class_id: ... }
+            });
+
+            if (!res.ok) throw new Error("Server Response Error");
+            const data = await res.json();
+
+            startScanningUI();
+            playMixedSoundLoop(data.otp_binary);
+
+        } catch(e) {
+            console.error(e);
+            alert("通信エラーが発生しました");
+            stopSound();
+        }
+    });
+}
+
+function startScanningUI() {
+    isScanning = true;
+    submitBtn.textContent = '停止する';
+    submitBtn.classList.add('is-processing');
+    if(classSelect) classSelect.disabled = true;
+}
+
+function stopScanningUI() {
+    isScanning = false;
+    submitBtn.textContent = '出席確認';
+    submitBtn.classList.remove('is-processing');
+    if(classSelect) classSelect.disabled = false;
+}
+
+// BGMと信号の再生開始
+function playMixedSoundLoop(binaryStr) {
+    if (!audioCtx) return;
+
+    // BGM再生
+    if (bgmBuffer) {
+        bgmSource = audioCtx.createBufferSource();
+        bgmSource.buffer = bgmBuffer;
+        bgmSource.loop = true;
+
+        bgmGainNode = audioCtx.createGain();
+        bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
+
+        bgmSource.connect(bgmGainNode);
+        bgmGainNode.connect(audioCtx.destination);
+        bgmSource.start(0);
+    }
+
+    playSignalRecursive(binaryStr);
+}
+
+// 信号パターンの再帰再生
+function playSignalRecursive(binaryStr) {
+    if (!isScanning || !audioCtx) return;
+
+    osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+
+    // スライダーから信号音量を取得
+    const currentVol = volSlider ? parseFloat(volSlider.value) : 0.1;
+    oscGain.gain.value = currentVol;
+
+    osc.connect(oscGain);
+    oscGain.connect(audioCtx.destination);
+
+    const startTime = audioCtx.currentTime;
+
+    // 1. スタートマーカー (19000Hz)
+    osc.frequency.setValueAtTime(FREQ_START, startTime);
+
+    // 2. データビット (18500Hz / 19500Hz)
+    for (let i = 0; i < binaryStr.length; i++) {
+        const bit = binaryStr[i];
+        const time = startTime + BIT_DURATION + (i * BIT_DURATION);
+        
+        // ビット0なら18500Hz, ビット1なら19500Hzへ切り替え
+        osc.frequency.setValueAtTime((bit === '1' ? FREQ_BIT_1 : FREQ_BIT_0), time);
+    }
+
+    // 終了時間を計算 (マーカー1音 + データ4音)
+    const totalDuration = BIT_DURATION + (binaryStr.length * BIT_DURATION);
+    const endTime = startTime + totalDuration;
+
+    osc.start(startTime);
+    osc.stop(endTime);
+
+    osc.onended = () => {
+        osc = null;
+        if (isScanning) {
+            // ループ間隔をあけて再実行
+            nextSignalTimer = setTimeout(() => {
+                playSignalRecursive(binaryStr);
+            }, LOOP_GAP_SEC * 1000);
+        }
     };
-    // スタート信号直後の待ち時間を短縮（350ms）
-    setTimeout(readBit, 350); 
+}
+
+// 停止処理
+function stopSound() {
+    isScanning = false;
+    if (nextSignalTimer) {
+        clearTimeout(nextSignalTimer);
+        nextSignalTimer = null;
+    }
+    if(osc) {
+        try{ osc.stop(); }catch(e){}
+        osc = null;
+    }
+    if(bgmSource) {
+        try{ bgmSource.stop(); }catch(e){}
+        bgmSource = null;
+    }
+
+    bgmGainNode = null;
+    stopScanningUI();
 }
