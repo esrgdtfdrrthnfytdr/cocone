@@ -6,15 +6,23 @@ let detectedBits = "";
 let state = "IDLE";
 let dynamicThreshold = 35; // キャリブレーションで動的に上書きされます
 
+// static/js/test_student.js
+
 // ==========================================
-// 周波数設定（test_teacher.jsと同期）
+// 周波数設定（高周波シフト版）
 // ==========================================
-const FREQ_MARKER_MIN = 18800; 
-const FREQ_MARKER_MAX = 19250; // 19000Hz付近：スタート信号
-const FREQ_BIT_0_MIN  = 18200;
-const FREQ_BIT_0_MAX  = 18800; // 18500Hz付近：ビット0（幅を広めに設定）
-const FREQ_BIT_1_MIN  = 19200;
-const FREQ_BIT_1_MAX  = 19800; // 19500Hz付近：ビット1（幅を広めに設定）
+
+// スタート信号（19000Hz付近）：ここは実績があるのでそのまま維持
+const FREQ_MARKER_MIN = 18900; 
+const FREQ_MARKER_MAX = 19100; 
+
+// ビット0（19300Hz付近）：ここが今回のキモです
+const FREQ_BIT_0_MIN  = 19200;
+const FREQ_BIT_0_MAX  = 19400; 
+
+// ビット1（19700Hz付近）：さらに高い位置へ
+const FREQ_BIT_1_MIN  = 19600;
+const FREQ_BIT_1_MAX  = 19800;
 
 // UI要素
 const registerBtn = document.getElementById('register-btn');
