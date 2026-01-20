@@ -3,7 +3,7 @@ import sys
 import random
 import datetime
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, List
 from collections import defaultdict
 import csv
 import io
@@ -17,7 +17,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# コンソールでの文字化け対策
 sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
@@ -28,10 +27,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-# 文字化け対策オプション付き
 engine = create_engine(DATABASE_URL, connect_args={"options": "-c client_encoding=utf8"})
 
-# --- Pydanticモデル ---
 class GenerateOTPRequest(BaseModel):
     class_id: Optional[str] = None
     period: int = 1
@@ -47,7 +44,17 @@ class UpdateStatusRequest(BaseModel):
     status: str
     note: Optional[str] = None
 
-# --- ヘルパー関数 ---
+class DeleteUsersRequest(BaseModel):
+    student_numbers: List[str]
+
+class AddUserRequest(BaseModel):
+    student_number: str
+    name: str
+    email: str
+    password: str
+    class_name: str
+    attendance_no: int
+
 def get_teacher_classes(teacher_id: int):
     classes_list = []
     try:
@@ -72,8 +79,6 @@ def render_page(request: Request, template_name: str, extra_context: dict = None
     if extra_context:
         context.update(extra_context)
     return templates.TemplateResponse(template_name, context)
-
-# --- ルーティング ---
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -111,22 +116,9 @@ async def roll_call(request: Request):
     classes = get_teacher_classes(user_id)
     return render_page(request, "rollCall.html", {"classes": classes})
 
-#テスト用ページのパス
-@app.get("/test_teacher", response_class=HTMLResponse)
-async def test_teacher(request: Request):
-    role = request.session.get("role")
-    user_id = request.session.get("user_id")
-    if role != "teacher": return RedirectResponse(url="/", status_code=303)
-    classes = get_teacher_classes(user_id)
-    return render_page(request, "test_teacher.html", {"classes": classes})
-
 @app.get("/register", response_class=HTMLResponse)
 async def register(request: Request):
     return render_page(request, "register.html")
-
-@app.get("/student", response_class=HTMLResponse)
-async def register(request: Request):
-    return render_page(request, "test_student.html")
 
 @app.get("/attendanceFilter", response_class=HTMLResponse)
 async def attendance_filter(request: Request):
@@ -154,11 +146,9 @@ async def attendance_result(request: Request, class_name: Optional[str]=None, st
 
     try:
         with engine.connect() as conn:
-            # 1. 生徒取得
             sql_students = text("SELECT student_number, name, attendance_no FROM students WHERE homeroom_class = :c_name ORDER BY attendance_no")
             students_rows = conn.execute(sql_students, {"c_name": class_name}).fetchall()
 
-            # 2. セッション取得
             sql_sessions = text("""
                 SELECT DISTINCT s.session_id, s.date, s.period
                 FROM class_sessions s
@@ -171,7 +161,6 @@ async def attendance_result(request: Request, class_name: Optional[str]=None, st
             """)
             sessions_rows = conn.execute(sql_sessions, {"c_name": class_name, "start": start_date, "end": end_date}).fetchall()
 
-            # 3. 出席結果マップ作成
             session_ids = [row.session_id for row in sessions_rows]
             attendance_map = {}
             if session_ids:
@@ -182,14 +171,12 @@ async def attendance_result(request: Request, class_name: Optional[str]=None, st
                 for r in results_rows:
                     attendance_map[(r.student_number, r.session_id)] = r.status
 
-            # 日付キーを文字列に統一
             sessions_by_date = defaultdict(dict)
             for row in sessions_rows:
                 d_str = row.date.strftime('%Y-%m-%d') if isinstance(row.date, datetime.date) else str(row.date)
                 p = row.period if row.period else 1
                 sessions_by_date[d_str][p] = row.session_id
 
-            # データ構築
             for stu in students_rows:
                 stu_record = {
                     "number": stu.attendance_no,
@@ -247,10 +234,8 @@ async def user_management(request: Request):
                 val = r.student_number
                 admission_year = ""
                 if val:
-                    # s20250001 -> 2025 (4 digits)
                     if val.startswith('s') and len(val) >= 5:
                         admission_year = val[1:5]
-                    # 20224055 -> 2022 (4 digits)
                     elif len(val) >= 4:
                         admission_year = val[:4]
                 
@@ -288,7 +273,6 @@ async def user_management(request: Request):
 @app.get("/passwordChange", response_class=HTMLResponse)
 async def password_change(request: Request): return render_page(request, "passwordChange.html")
 
-# --- API ---
 @app.post("/api/generate_otp")
 async def generate_otp(req: GenerateOTPRequest):
     val = random.randint(0, 15)
@@ -372,7 +356,47 @@ async def update_status(req: UpdateStatusRequest):
         print(f"❌ Update Error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
-# ▼▼▼ 追加: CSVダウンロードAPI ▼▼▼
+@app.post("/api/delete_users")
+async def delete_users(req: DeleteUsersRequest):
+    if not req.student_numbers:
+        return JSONResponse({"status": "error", "message": "No users selected"})
+    
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM attendance_results WHERE student_number = ANY(:ids)"),
+                {"ids": req.student_numbers}
+            )
+            conn.execute(
+                text("DELETE FROM students WHERE student_number = ANY(:ids)"),
+                {"ids": req.student_numbers}
+            )
+        return JSONResponse({"status": "success"})
+    except Exception as e:
+        print(f"Delete Error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/add_user")
+async def add_user(req: AddUserRequest):
+    try:
+        with engine.begin() as conn:
+            exist = conn.execute(text("SELECT 1 FROM students WHERE student_number = :id"), {"id": req.student_number}).fetchone()
+            if exist:
+                return JSONResponse({"status": "error", "message": "この学籍番号は既に登録されています"})
+            
+            exist_email = conn.execute(text("SELECT 1 FROM students WHERE email = :email"), {"email": req.email}).fetchone()
+            if exist_email:
+                return JSONResponse({"status": "error", "message": "このメールアドレスは既に登録されています"})
+
+            conn.execute(
+                text("INSERT INTO students (student_number, name, email, password_hash, homeroom_class, attendance_no) VALUES (:id, :name, :email, :pass, :cls, :no)"),
+                {"id": req.student_number, "name": req.name, "email": req.email, "pass": req.password, "cls": req.class_name, "no": req.attendance_no}
+            )
+        return JSONResponse({"status": "success"})
+    except Exception as e:
+        print(f"Add User Error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
 @app.get("/api/download_csv")
 async def download_csv(class_name: str, start_date: str, end_date: str):
     output = io.StringIO()
@@ -386,11 +410,9 @@ async def download_csv(class_name: str, start_date: str, end_date: str):
         date_list = [(s_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(delta.days + 1)]
 
         with engine.connect() as conn:
-            # 1. 生徒
             sql_students = text("SELECT student_number, name, attendance_no FROM students WHERE homeroom_class = :c_name ORDER BY attendance_no")
             students = conn.execute(sql_students, {"c_name": class_name}).fetchall()
 
-            # 2. セッション
             sql_sessions = text("""
                 SELECT s.session_id, s.date, s.period
                 FROM class_sessions s
@@ -407,7 +429,6 @@ async def download_csv(class_name: str, start_date: str, end_date: str):
                 d_str = s.date.strftime('%Y-%m-%d') if isinstance(s.date, datetime.date) else str(s.date)
                 session_map[d_str][s.period] = s.session_id
 
-            # 3. 結果
             res_map = {}
             if sessions:
                 s_ids = [s.session_id for s in sessions]
@@ -418,7 +439,6 @@ async def download_csv(class_name: str, start_date: str, end_date: str):
                 for r in results:
                     res_map[(r.student_number, r.session_id)] = (r.status, r.note)
 
-            # CSV行生成
             for d_str in date_list:
                 for period in range(1, 5):
                     sess_id = session_map.get(d_str, {}).get(period)
@@ -442,7 +462,6 @@ async def download_csv(class_name: str, start_date: str, end_date: str):
         writer.writerow(["Error", str(e)])
 
     output.seek(0)
-    # Excelで文字化けしないようBOM付きUTF-8
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode('utf-8-sig')),
         media_type="text/csv",
