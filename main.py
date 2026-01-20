@@ -131,7 +131,7 @@ async def test_teacher(request: Request):
 async def register(request: Request):
     return render_page(request, "register.html")
 
-@app.get("/student", response_class=HTMLResponse)
+@app.get("/test_student", response_class=HTMLResponse)
 async def register(request: Request):
     return render_page(request, "test_student.html")
 
