@@ -433,7 +433,7 @@ async def upload_users_csv(file: UploadFile = File(...)):
         rows = list(csv_reader)
         
         if not rows:
-             return JSONResponse({"status": "error", "message": "ファイルの中身が空です"}, status_code=400)
+            return JSONResponse({"status": "error", "message": "ファイルの中身が空です"}, status_code=400)
 
         with engine.begin() as conn:
             success_count = 0
