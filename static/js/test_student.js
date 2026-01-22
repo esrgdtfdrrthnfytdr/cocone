@@ -1,151 +1,150 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // ==========================================
-    // 1. DOM要素の取得
-    // ==========================================
-    const startBtn = document.getElementById('submit-btn'); // 出席開始ボタン
-    const stopBtn = document.getElementById('stop-btn');    // 停止ボタン
-    const classSelect = document.getElementById('class-select'); // クラス選択プルダウン
-    
-    const otpNumberDisplay = document.getElementById('otp-number'); // 数字表示エリア
-    const statusMessage = document.getElementById('status-message'); // ステータス表示
+let audioCtx, analyser, dataArray;
+let isListening = false;
+let detectedBits = "";
+let state = "IDLE";
 
-    // 音響通信用の変数
-    let isPlaying = false;
-    let sequenceLoop = null;
-    let synth = null;
+// 周波数設定 (Teacherに合わせる)
+const FREQ_START_MIN = 16800;
+const FREQ_START_MAX = 17200;
 
-    // ==========================================
-    // 2. 音響通信の設定 (Tone.js)
-    // ==========================================
-    // 変更点: 4ビットの0/1に対応する周波数 + マーカー音
-    // 安定性を高めるため、周波数間隔を広げ、速度(DURATION)を落としました
-    const FREQ_MARKER = 17000; // 開始合図 (18000 -> 17000Hz)
-    const FREQ_BIT_0  = 18000; // ビット0 (18500 -> 18000Hz)
-    const FREQ_BIT_1  = 19000; // ビット1 (変更なし)
-    const DURATION    = 0.5;   // 1音の長さ(秒) ※0.1 -> 0.5へ変更
+// UI要素
+const registerBtn = document.getElementById('register-btn');
+const statusMsg = document.getElementById('status-msg');
+const debugFreq = document.getElementById('debug-freq');
+const debugBits = document.getElementById('debug-bits');
 
-    // 音の再生準備
-    async function initAudio() {
-        await Tone.start();
-        if (!synth) {
-            synth = new Tone.Synth().toDestination();
-            synth.volume.value = -10; // 音量調整
-        }
-    }
+// テスト用正解定義
+const TARGET_BINARY = "1111";
 
-    // OTP(2進数文字列)を音に変換してループ再生
-    function playSoundPattern(binaryStr) {
-        // パターン作成: [マーカー, bit0, bit1, bit2, bit3, 休止...]
-        const pattern = [];
-        
-        // 1. 開始マーカー
-        pattern.push({ time: 0, freq: FREQ_MARKER });
-
-        // 2. データビット (4bit)
-        for (let i = 0; i < 4; i++) {
-            const bit = binaryStr[i];
-            const freq = (bit === '1') ? FREQ_BIT_1 : FREQ_BIT_0;
-            pattern.push({ time: (i + 1) * DURATION, freq: freq });
-        }
-
-        // 3. ループ設定
-        // 変更点: 最後の休止を少し長めにとる (0.5 -> 1.0)
-        const totalDuration = (1 + 4) * DURATION + 1.0; 
-
-        sequenceLoop = new Tone.Loop((time) => {
-            // マーカー再生
-            synth.triggerAttackRelease(FREQ_MARKER, DURATION, time);
-
-            // 各ビット再生
-            for (let i = 0; i < 4; i++) {
-                const bit = binaryStr[i];
-                const freq = (bit === '1') ? FREQ_BIT_1 : FREQ_BIT_0;
-                const noteTime = time + ((i + 1) * DURATION);
-                synth.triggerAttackRelease(freq, DURATION, noteTime);
-            }
-        }, totalDuration).start(0);
-
-        Tone.Transport.start();
-        isPlaying = true;
-    }
-
-    // ==========================================
-    // 3. イベントリスナー (ボタン操作)
-    // ==========================================
-
-    // ▼ 出席開始ボタン
-    startBtn.addEventListener('click', async () => {
-        // (1) クラス選択チェック
-        const classId = classSelect.value;
-        if (!classId) {
-            alert("クラスを選択してください！");
-            return;
-        }
-
-        // (2) オーディオ初期化
-        await initAudio();
-
-        // (3) ボタン状態の切り替え
-        startBtn.disabled = true;
-        classSelect.disabled = true; // 途中でクラスを変えられないようにする
-        stopBtn.disabled = false;
-        statusMessage.textContent = "出席受付中...音声を送信しています";
-        statusMessage.style.color = "red";
-
+if (registerBtn) {
+    registerBtn.addEventListener('click', async () => {
+        if (registerBtn.classList.contains('is-processing')) return;
         try {
-            // (4) APIへOTP生成リクエスト (クラスIDを送信)
-            const res = await fetch('/api/generate_otp', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ class_id: classId }) // ★ここでIDを送る
-            });
-
-            if (!res.ok) {
-                throw new Error("API Error");
-            }
-
-            const data = await res.json();
-            const otpDisplay = data.otp_display; // 画面表示用 (例: 10)
-            const otpBinary  = data.otp_binary;  // 音響用 (例: "1010")
-
-            // (5) 画面更新
-            otpNumberDisplay.textContent = otpDisplay;
-
-            // (6) 音声送信開始
-            console.log(`Playing Sound for OTP: ${otpDisplay} (${otpBinary})`);
-            playSoundPattern(otpBinary);
-
-        } catch (err) {
-            console.error(err);
-            alert("エラーが発生しました");
-            // エラー時はリセット
-            stopAttendance();
+            await startMic();
+        } catch (e) {
+            alert("マイクエラー: " + e);
         }
     });
+}
 
-    // ▼ 停止ボタン
-    stopBtn.addEventListener('click', () => {
-        stopAttendance();
-    });
+async function startMic() {
+    registerBtn.textContent = '信号待機中...';
+    registerBtn.classList.add('is-processing');
+    if(statusMsg) statusMsg.innerText = "マイク起動: '1111'を待っています";
+    if(debugBits) debugBits.innerText = "";
 
-    // 停止処理
-    function stopAttendance() {
-        // 音を止める
-        if (sequenceLoop) {
-            sequenceLoop.stop();
-            sequenceLoop.dispose();
-            sequenceLoop = null;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // iOS対策(無音再生)
+    const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
+    const source = audioCtx.createBufferSource();
+    source.buffer = emptyBuffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const mediaSource = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048; 
+    analyser.smoothingTimeConstant = 0.5;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 16000; 
+    mediaSource.connect(filter);
+    filter.connect(analyser);
+    
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    isListening = true;
+    state = "IDLE";
+    updateLoop();
+}
+
+function getDominantFrequency() {
+    analyser.getByteFrequencyData(dataArray);
+    let maxVal = 0;
+    let maxIndex = 0;
+    const nyquist = audioCtx.sampleRate / 2;
+    const minIndex = Math.floor(16000 * dataArray.length / nyquist);
+
+    for (let i = minIndex; i < dataArray.length; i++) {
+        if (dataArray[i] > maxVal) {
+            maxVal = dataArray[i];
+            maxIndex = i;
         }
-        Tone.Transport.stop();
-        isPlaying = false;
-
-        // UIを元に戻す
-        startBtn.disabled = false;
-        classSelect.disabled = false;
-        stopBtn.disabled = true;
-        
-        statusMessage.textContent = "待機中";
-        statusMessage.style.color = "#333";
-        otpNumberDisplay.textContent = "----";
     }
-});
+    if (maxVal < 30) return 0; 
+    return maxIndex * nyquist / dataArray.length;
+}
+
+function updateLoop() {
+    if (!isListening) return;
+    requestAnimationFrame(updateLoop);
+    const freq = getDominantFrequency();
+    if (debugFreq) debugFreq.innerText = Math.round(freq) + " Hz";
+
+    // スタート信号検知
+    if (state === "IDLE" && freq > FREQ_START_MIN && freq < FREQ_START_MAX) {
+        console.log("Start detected!");
+        if(statusMsg) statusMsg.innerText = `受信開始! (${Math.round(freq)}Hz)`;
+        startReceivingSequence();
+    }
+}
+
+function startReceivingSequence() {
+    if (state !== "IDLE") return;
+    state = "RECEIVING";
+    detectedBits = "";
+    let bitCount = 0;
+
+    const readBit = () => {
+        const freq = getDominantFrequency();
+        let bit = "?";
+        
+        // Bit判定 (1=19000Hz, 0=18000Hz)
+        if (freq > 18800 && freq < 19200) bit = "1";      
+        else if (freq > 17800 && freq < 18200) bit = "0"; 
+        
+        if (debugBits) debugBits.innerText += (bit === "?" ? "_" : bit) + " ";
+        if (bit === "?") bit = "0"; // エラー訂正
+        
+        detectedBits += bit;
+        bitCount++;
+        
+        if (bitCount < 4) {
+            setTimeout(readBit, 500); 
+        } else {
+            finishReceiving();
+        }
+    };
+    
+    // タイミング調整 (Start 0.5s + 待機 0.25s)
+    setTimeout(readBit, 750);
+}
+
+function finishReceiving() {
+    state = "IDLE";
+    isListening = false; // 受信停止
+    registerBtn.classList.remove('is-processing');
+    registerBtn.textContent = '出席登録(テスト)';
+
+    console.log("Result Binary:", detectedBits);
+
+    // ★ サーバー通信なしで判定 ★
+    if (detectedBits === TARGET_BINARY) {
+        alert("【テスト成功】\n正しく '1111' を受信しました！");
+        if(statusMsg) {
+            statusMsg.innerText = "受信成功: 1111";
+            statusMsg.style.color = "green";
+            statusMsg.style.fontWeight = "bold";
+        }
+        if(debugBits) debugBits.innerHTML += "<br>✅ MATCHED!";
+    } else {
+        alert(`【テスト失敗】\n期待値: ${TARGET_BINARY}\n受信値: ${detectedBits}\n\n周波数や距離を調整して再試行してください。`);
+        if(statusMsg) {
+            statusMsg.innerText = `不一致: ${detectedBits}`;
+            statusMsg.style.color = "red";
+        }
+    }
+}
