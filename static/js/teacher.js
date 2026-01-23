@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. UI要素の取得
     // ==========================================
     const startBtn = document.getElementById('submit-btn');
-    // HTMLにある "status-area" を取得します
     const statusArea = document.getElementById('status-area');
 
     // ==========================================
@@ -46,11 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
         isPlaying = true;
     }
 
-    // ★画面表示を更新する関数
     function updateDisplay(msg, otp = null, color = "#666") {
         if (!statusArea) return;
-
-        // OTPがある場合は大きく表示、なければメッセージのみ
         if (otp !== null) {
             statusArea.innerHTML = `
                 <div style="font-size: 3rem; font-weight: bold; color: #333; margin-bottom: 10px;">${otp}</div>
@@ -66,39 +62,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
-            // 停止処理
             if (isPlaying) {
                 stopAttendance();
                 return;
             }
 
-            // ★クラスID固定 (デモ用: 1)
-            const classId = 1; 
+            // ★修正箇所: IDを数字の 1 ではなく、文字列の "1" に変更します
+            const classId = "1"; 
 
             try {
                 await initAudio(); 
 
-                // ボタン無効化・準備中表示
                 startBtn.disabled = true;
                 updateDisplay("OTP取得中...");
 
-                // APIコール
                 const res = await fetch('/api/generate_otp', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ class_id: classId })
                 });
 
-                if (!res.ok) throw new Error("API Error");
+                if (!res.ok) {
+                    // エラーの詳細をコンソールに出して確認しやすくする
+                    const errData = await res.json();
+                    console.error("API Detail Error:", errData);
+                    throw new Error("API Error");
+                }
                 const data = await res.json();
                 
-                const otpDisplay = data.otp_display; // 表示用 (例: 10)
-                const otpBinary  = data.otp_binary;  // 音響用 (例: 1010)
+                const otpDisplay = data.otp_display; 
+                const otpBinary  = data.otp_binary;  
 
-                // 送信中表示
                 updateDisplay("信号送信中...", otpDisplay, "#E74C3C");
 
-                // ボタンを「停止」に変更
                 startBtn.textContent = "停止";
                 startBtn.style.backgroundColor = "#ff6b6b"; 
                 startBtn.disabled = false;
@@ -108,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error(err);
-                alert("エラー: " + err.message);
+                alert("エラー: 通信に失敗しました。コンソールを確認してください。");
                 stopAttendance();
             }
         });
@@ -131,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
             startBtn.disabled = false;
         }
         
-        // 待機中表示に戻す
         updateDisplay("待機中");
     }
 });
