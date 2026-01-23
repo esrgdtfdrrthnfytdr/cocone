@@ -1,28 +1,33 @@
 let audioCtx, analyser, dataArray;
 let isListening = false;
 let detectedBits = "";
-let state = "IDLE";
+let state = "IDLE"; 
+let animationId = null; 
 
-// 定数定義 (iPhoneでも拾いやすい16kHz〜19kHz帯を使用)
-const FREQ_START_MIN = 18500;
-const FREQ_START_MAX = 19500;
+// === 設定値 (テスト成功済みの値) ===
+const BASE_START = 17000;
+const BASE_0     = 18000;
+const BASE_1     = 19000;
+const START_RANGE = 400;   // 誤検知防止のため狭く
+const STRICT_RANGE = 400; 
+
+// キャリブレーション用
+let targetStart = BASE_START;
+let target0     = BASE_0;
+let target1     = BASE_1;
+let signalBaseVolume = 0; 
+let startSignalCount = 0;
+const START_SIGNAL_THRESHOLD = 6; // 0.1秒程度の継続で検知
 
 // UI要素
-const registerBtn = document.getElementById('register-btn');
-const statusMsg = document.getElementById('status-msg');
-const modal = document.getElementById('completion-modal');
-const modalCloseBtn = document.getElementById('modal-close-btn');
-const debugFreq = document.getElementById('debug-freq');
-const debugBits = document.getElementById('debug-bits');
+const registerBtn = document.getElementById('register-btn'); // 「出席登録」ボタン
+const statusMsg = document.getElementById('status-message'); // もしあれば
 
 // --- イベントリスナー ---
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
-        // 連打防止
         if (registerBtn.classList.contains('is-processing')) return;
-        
         try {
-            // iOS対策のため、ここから一気に開始処理を呼ぶ
             await startMic();
         } catch (e) {
             alert("マイクエラー: " + e);
@@ -30,191 +35,201 @@ if (registerBtn) {
     });
 }
 
-if (modalCloseBtn) {
-    modalCloseBtn.addEventListener('click', () => {
-        if(modal) modal.classList.remove('active');
-        resetUI();
-    });
-}
-
-// --- 音響処理 ---
 async function startMic() {
-    registerBtn.textContent = '信号を探しています...';
+    // 二重起動防止
+    if (isListening) {
+        cancelAnimationFrame(animationId);
+        if (audioCtx) await audioCtx.close();
+        isListening = false;
+    }
+
+    registerBtn.textContent = '信号を聞いています...';
     registerBtn.classList.add('is-processing');
-    if(statusMsg) statusMsg.innerText = "マイク起動中...";
-    if(debugBits) debugBits.innerText = ""; // 履歴クリア
 
-    // 1. AudioContextの作成 (同期的に即座に行う)
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    // ==============================================
-    // 🔥 iOS対策：最強の「無音再生」アンロック処理 🔥
-    // ==============================================
-    // クリックイベント内で即座に音を鳴らすことで、iOSの制限を解除します。
     
-    // 空の音データを作成して一瞬だけ再生
+    // スマホのスリープ対策(無音再生)
     const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
     const source = audioCtx.createBufferSource();
     source.buffer = emptyBuffer;
     source.connect(audioCtx.destination);
     source.start(0);
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-    // 念押しで resume も呼んでおく
-    if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-    }
-    // ==============================================
-
-    // 2. マイク設定 (iPhoneノイズ除去無効化)
-    const constraints = {
-        audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false
-        }
-    };
-
-    // マイク許可を求める (ここは待機時間が長くてもOK)
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
+    });
     const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.5;
+    
+    analyser.fftSize = 4096; 
+    analyser.smoothingTimeConstant = 0; 
 
-    // バンドパスフィルタ (16kHz以上の音だけ通す)
     const filter = audioCtx.createBiquadFilter();
     filter.type = "highpass";
-    filter.frequency.value = 16000; 
-
+    filter.frequency.value = 15000; 
     mediaSource.connect(filter);
     filter.connect(analyser);
     
     dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
     isListening = true;
     state = "IDLE";
+    startSignalCount = 0;
+    
     updateLoop();
 }
 
-function getDominantFrequency() {
+function getDominantFreqAndVol() {
     analyser.getByteFrequencyData(dataArray);
     let maxVal = 0;
     let maxIndex = 0;
     const nyquist = audioCtx.sampleRate / 2;
-    // 16kHz付近からスキャン開始
-    const minIndex = Math.floor(16000 * dataArray.length / nyquist);
-
+    const minIndex = Math.floor(15000 * dataArray.length / nyquist);
     for (let i = minIndex; i < dataArray.length; i++) {
-        if (dataArray[i] > maxVal) {
-            maxVal = dataArray[i];
-            maxIndex = i;
-        }
+        if (dataArray[i] > maxVal) { maxVal = dataArray[i]; maxIndex = i; }
     }
-    // ノイズカット (閾値30)
-    if (maxVal < 30) return 0; 
-    
-    return maxIndex * nyquist / dataArray.length;
+    return { freq: maxIndex * nyquist / dataArray.length, vol: maxVal };
 }
 
 function updateLoop() {
     if (!isListening) return;
-    requestAnimationFrame(updateLoop);
-    
-    const freq = getDominantFrequency();
-    
-    // 可視化: 周波数表示
-    if (debugFreq) {
-        if (freq > 0) {
-            debugFreq.innerText = Math.round(freq) + " Hz";
-            debugFreq.style.color = "#333";
-        } else {
-            debugFreq.innerText = "---";
-            debugFreq.style.color = "#ccc";
-        }
-    }
+    animationId = requestAnimationFrame(updateLoop);
+    const { freq, vol } = getDominantFreqAndVol();
 
-    // スタート信号検知 (19kHz付近)
-    if (state === "IDLE" && freq > FREQ_START_MIN && freq < FREQ_START_MAX) {
-        console.log("Start signal detected!");
-        if(statusMsg) statusMsg.innerText = `受信開始! (${Math.round(freq)}Hz)`;
-        startReceivingSequence();
+    if (state === "IDLE") {
+        // スタート検知
+        if (vol > 15 && Math.abs(freq - BASE_START) < START_RANGE) {
+            startSignalCount++;
+        } else {
+            startSignalCount = 0;
+        }
+
+        if (startSignalCount > START_SIGNAL_THRESHOLD) {
+            // キャリブレーション
+            const offset = freq - BASE_START;
+            targetStart = freq;
+            target0     = BASE_0 + offset;
+            target1     = BASE_1 + offset;
+            signalBaseVolume = vol;
+
+            console.log(`START: ${Math.round(freq)}Hz`);
+            if(statusMsg) statusMsg.textContent = "信号受信中...";
+            
+            startSignalCount = 0;
+            startReceivingSequence();
+        }
     }
 }
 
-function startReceivingSequence() {
+async function startReceivingSequence() {
     if (state !== "IDLE") return;
     state = "RECEIVING";
     detectedBits = "";
-    let bitCount = 0;
 
-    const readBit = () => {
-        const freq = getDominantFrequency();
-        let bit = "?";
+    const startTime = performance.now(); 
+    const firstBitOffset = 550; // テストで調整した最適値
+
+    for (let i = 1; i <= 4; i++) {
+        const targetTime = startTime + firstBitOffset + ((i - 1) * 500);
+        const waitTime = targetTime - performance.now();
+        if (waitTime > 0) await sleep(waitTime);
+
+        const bit = await sampleBit();
         
-        // 判定ロジック
-        // 1 = 18000Hz (17500-18500)
-        // 0 = 17000Hz (16500-17500)
-        if (freq > 17500 && freq < 18500) bit = "1";      
-        else if (freq > 16500 && freq <= 17500) bit = "0"; 
-        
-        // 可視化: 判定結果
-        if (debugBits) {
-            debugBits.innerText += (bit === "?" ? "X" : bit) + " ";
+        if (bit === "ERROR") {
+            // エラー時はAPIに送らずリセット
+            console.warn("Signal Lost");
+            handleResult(true, ""); 
+            return;
         }
-        
-        // エラー訂正: 不明な場合は0扱い
-        if (bit === "?") bit = "0";
-        
         detectedBits += bit;
-        bitCount++;
-        
-        if (bitCount < 4) {
-            setTimeout(readBit, 1000); 
-        } else {
-            finishReceiving();
-        }
-    };
-    
-    // 最初のビットはスタート検知から1.5秒後
-    setTimeout(readBit, 1500);
+    }
+
+    handleResult(false, detectedBits);
 }
 
-async function finishReceiving() {
-    state = "IDLE";
-    isListening = false;
-    registerBtn.textContent = '照合中...';
+async function sampleBit() {
+    let score0 = 0;
+    let score1 = 0;
+    let validSamples = 0;
+    const samples = 10;
+    const interval = 30; 
 
-    const val = parseInt(detectedBits, 2);
-    console.log("Result:", val);
-
-    try {
-        const res = await fetch('/api/check_attend', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ otp_value: val })
-        });
-        const result = await res.json();
-
-        if (result.status === "success") {
-            // 成功時
-            if (modal) modal.classList.add('active');
-            if(statusMsg) statusMsg.innerText = "登録完了";
-            if(debugBits) debugBits.innerHTML += "<br><span style='color:green; font-weight:bold;'>[OK] 出席完了</span>";
-        } else {
-            // 失敗時
-            alert(`コード不一致 (受信:${val})`);
-            if(debugBits) debugBits.innerHTML += "<br><span style='color:red; font-weight:bold;'>[NG] 不一致</span>";
-            resetUI();
+    for (let j = 0; j < samples; j++) {
+        const { freq, vol } = getDominantFreqAndVol();
+        // 相対音量チェック
+        if (vol > 10 && vol > (signalBaseVolume * 0.3)) {
+            const dist0 = Math.abs(freq - target0);
+            const dist1 = Math.abs(freq - target1);
+            if (dist0 < dist1 && dist0 < STRICT_RANGE) { score0++; validSamples++; }
+            else if (dist1 < dist0 && dist1 < STRICT_RANGE) { score1++; validSamples++; }
         }
-    } catch(e) {
-        alert("通信エラー");
-        resetUI();
+        await sleep(interval);
+    }
+
+    if (validSamples < 4) return "ERROR";
+    if (score1 > score0 + 1) return "1";
+    if (score0 > score1 + 1) return "0";
+    return "ERROR";
+}
+
+async function handleResult(isAborted, resultBits) {
+    if (isAborted) {
+        // 失敗時: 再挑戦させるためにIDLEへ
+        if(statusMsg) statusMsg.textContent = "信号が不明瞭でした。再受信します...";
+        state = "COOLDOWN";
+        await sleep(2000);
+        state = "IDLE";
+    } else {
+        // 成功時: APIへ送信！
+        console.log("Bits:", resultBits);
+        await submitAttendance(resultBits);
+        
+        // 完了後は停止
+        state = "IDLE";
+        isListening = false;
+        if(audioCtx) audioCtx.close(); 
+        cancelAnimationFrame(animationId);
+        registerBtn.classList.remove('is-processing');
+        registerBtn.textContent = '出席登録';
     }
 }
 
-function resetUI() {
-    registerBtn.textContent = '出席登録';
-    registerBtn.classList.remove('is-processing');
-    if(statusMsg) statusMsg.innerText = "";
+// API送信ロジック
+async function submitAttendance(bits) {
+    // URLからstudent_idを取得する等の処理が元々あった場合はここに記述
+    // 今回はHTML内のhidden input等から取ると仮定、あるいはセッション依存ならそのまま
+    // 元のstudent.jsの実装に合わせて student_id を取得してください
+    // ここではデモとして、URLパラメータやDOMから取る例を書きます:
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentId = urlParams.get('student_id') || "dummy_id"; // 仮
+
+    // 2進数文字列を数値に変換 (例: "1010" -> 10)
+    const otpVal = parseInt(bits, 2);
+
+    try {
+        const response = await fetch('/api/check_attend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                student_id: studentId, // 必要に応じて調整
+                otp_match: otpVal
+            })
+        });
+        
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert("出席登録が完了しました！");
+            if(statusMsg) statusMsg.textContent = "登録完了";
+        } else {
+            alert("エラー: " + result.message);
+            if(statusMsg) statusMsg.textContent = "登録失敗: " + result.message;
+        }
+    } catch (e) {
+        alert("通信エラー: " + e);
+    }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }

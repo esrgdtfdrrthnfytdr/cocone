@@ -1,208 +1,167 @@
-let audioCtx;
-let bgmBuffer = null;
-let bgmSource = null;
-let bgmGainNode = null;
-let osc = null;
-let isScanning = false;
-let nextSignalTimer = null;
-let isBgmOn = true;
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. UI要素の取得
+    const startBtn = document.getElementById('submit-btn');
+    const classSelect = document.getElementById('class-select');
+    const otpNumberDisplay = document.getElementById('otp-number');
+    const statusMessage = document.getElementById('status-message');
+    
+    // 追加UI
+    const volSlider = document.getElementById('signal-volume');
+    const volDisplay = document.getElementById('vol-display');
+    const bgmBtn = document.getElementById('bgm-toggle-btn');
 
-// 設定
-const BGM_URL = '/static/sounds/bgm.wav'; 
+    // 2. 音響設定 (テスト済みの確定設定)
+    const FREQ_MARKER = 17000; 
+    const FREQ_BIT_0  = 18000; 
+    const FREQ_BIT_1  = 19000; 
+    const DURATION    = 0.5;   
+    const TONE_LENGTH = 0.4;   // 0.1秒の無音を作る
 
-// 周波数設定
-const FREQ_START = 19000; 
-const FREQ_1 = 18000;     
-const FREQ_0 = 17000;     
+    let isPlaying = false;
+    let sequenceLoop = null;
+    let synth = null;
+    let bgmPlayer = null;
+    let isBgmOn = true; 
 
-const BIT_DURATION = 1.0;
-const LOOP_GAP_SEC = 2.0;
-const BGM_VOLUME = 0.4;
+    // 初期化
+    async function initAudio() {
+        await Tone.start();
 
-// UI要素 (class-select ではなく course-select に変更)
-const submitBtn = document.getElementById('submit-btn');
-const courseSelect = document.getElementById('course-select');
-const errorMessage = document.getElementById('error-message');
-const volSlider = document.getElementById('signal-volume');
-const volDisplay = document.getElementById('vol-display');
-const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
-
-// スライダーの表示更新
-if (volSlider && volDisplay) {
-    volSlider.addEventListener('input', (e) => {
-        volDisplay.textContent = e.target.value;
-    });
-}
-
-// BGM切り替えボタン
-if (bgmToggleBtn) {
-    bgmToggleBtn.addEventListener('click', () => {
-        isBgmOn = !isBgmOn;
-        if (isBgmOn) {
-            bgmToggleBtn.textContent = "🎵 BGM: ON";
-            bgmToggleBtn.style.backgroundColor = "#63D2B0";
-            bgmToggleBtn.style.opacity = "1";
-        } else {
-            bgmToggleBtn.textContent = "🔇 BGM: OFF";
-            bgmToggleBtn.style.backgroundColor = "#95A5A6";
+        if (!synth) {
+            synth = new Tone.Synth({
+                oscillator: { type: "sine" }, // 正弦波
+                envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 0.05 }
+            }).toDestination();
+            if (volSlider) updateVolume(volSlider.value);
         }
-        if (bgmGainNode) {
-            bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-        }
-    });
-}
 
-// BGM読み込み
-window.addEventListener('load', async () => {
-    try {
-        window.AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-        
-        const response = await fetch(BGM_URL);
-        const arrayBuffer = await response.arrayBuffer();
-        bgmBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        console.log("BGM Ready");
-    } catch (e) {
-        console.error("BGM Load Error:", e);
+        if (!bgmPlayer) {
+            bgmPlayer = new Tone.Player({
+                url: "/static/sounds/bgm.wav", 
+                loop: true, volume: -15
+            }).toDestination();
+        }
     }
-});
 
+    // 音量反映
+    function updateVolume(val) {
+        if (!synth) return;
+        if (val <= 0) synth.volume.value = -100; 
+        else synth.volume.rampTo(20 * Math.log10(val), 0.1);
+        if (volDisplay) volDisplay.textContent = val;
+    }
 
+    // パターン再生 (APIから受け取った binaryStr を再生)
+    function playSoundPattern(binaryStr) {
+        const totalDuration = (1 + 4) * DURATION + 2.0; 
 
-if (submitBtn) {
-    submitBtn.addEventListener('click', async () => {
-        if (isScanning) {
-            stopSound();
+        sequenceLoop = new Tone.Loop((time) => {
+            // Start
+            synth.triggerAttackRelease(FREQ_MARKER, TONE_LENGTH, time);
+            // Bits
+            for (let i = 0; i < 4; i++) {
+                const bit = binaryStr[i];
+                const freq = (bit === '1') ? FREQ_BIT_1 : FREQ_BIT_0;
+                const noteTime = time + ((i + 1) * DURATION);
+                synth.triggerAttackRelease(freq, TONE_LENGTH, noteTime);
+            }
+        }, totalDuration).start(0);
+
+        Tone.Transport.start();
+        isPlaying = true;
+        if (isBgmOn && bgmPlayer && bgmPlayer.loaded) bgmPlayer.start();
+    }
+
+    // イベントリスナー
+    startBtn.addEventListener('click', async () => {
+        // 停止処理
+        if (isPlaying) {
+            stopAttendance();
             return;
         }
 
-//         // 科目が選択されているかチェック
-//         const selectedValue = courseSelect ? courseSelect.value : null;
-//         if (!selectedValue) {
-//             if(errorMessage) {
-//                 errorMessage.textContent = '科目を選択してください';
-//                 errorMessage.classList.add('show');
-//             }
-//             return;
-//         }
-
-        if(errorMessage) {
-            errorMessage.textContent = '';
-            errorMessage.classList.remove('show');
+        const classId = classSelect.value;
+        if (!classId) {
+            alert("クラスを選択してください！");
+            return;
         }
 
-        if (audioCtx && audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-        }
         try {
-            // APIへPOST送信 (course_id を含める)
+            await initAudio(); // AudioContext起動
+
+            // UIを準備中に
+            startBtn.disabled = true;
+            statusMessage.textContent = "OTP取得中...";
+
+            // APIからOTPを取得
             const res = await fetch('/api/generate_otp', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})  //空データ
-                // body: JSON.stringify({ course_id: parseInt(selectedValue) })コースID
+                body: JSON.stringify({ class_id: classId })
             });
-            
-            if (!res.ok) {
-                throw new Error("Server Response Error");
-            }
 
+            if (!res.ok) throw new Error("API Error");
             const data = await res.json();
             
-            startScanningUI();
-            playMixedSoundLoop(data.otp_binary);
-        } catch(e) {
-            console.error(e);
-            alert("通信エラーが発生しました");
+            // 取得成功 -> 再生開始
+            const otpDisplay = data.otp_display; // "10 (1010)"
+            const otpBinary  = data.otp_binary;  // "1010"
+
+            otpNumberDisplay.textContent = otpDisplay;
+            statusMessage.textContent = "信号送信中...";
+            statusMessage.style.color = "#E74C3C";
+
+            // ボタンを「停止」に変更
+            startBtn.textContent = "停止";
+            startBtn.style.backgroundColor = "#ff6b6b"; 
+            startBtn.disabled = false;
+            classSelect.disabled = true;
+
+            console.log(`Sending: ${otpBinary}`);
+            playSoundPattern(otpBinary);
+
+        } catch (err) {
+            console.error(err);
+            alert("エラー: " + err.message);
+            stopAttendance();
         }
     });
-}
 
-function startScanningUI() {
-    isScanning = true;
-    submitBtn.textContent = '停止する';
-    submitBtn.classList.add('is-processing');
-    if(courseSelect) courseSelect.disabled = true;
-}
+    // スライダー
+    if (volSlider) volSlider.addEventListener('input', (e) => updateVolume(e.target.value));
 
-function stopScanningUI() {
-    isScanning = false;
-    submitBtn.textContent = '出席確認';
-    submitBtn.classList.remove('is-processing');
-    if(courseSelect) courseSelect.disabled = false;
-}
-
-function playMixedSoundLoop(binaryStr) {
-    if (!bgmBuffer) return;
-
-    bgmSource = audioCtx.createBufferSource();
-    bgmSource.buffer = bgmBuffer;
-    bgmSource.loop = true;
-    
-    bgmGainNode = audioCtx.createGain();
-    bgmGainNode.gain.value = isBgmOn ? BGM_VOLUME : 0;
-    
-    bgmSource.connect(bgmGainNode);
-    bgmGainNode.connect(audioCtx.destination);
-    bgmSource.start(0);
-
-    playSignalRecursive(binaryStr);
-}
-
-function playSignalRecursive(binaryStr) {
-    if (!isScanning) return;
-
-    osc = audioCtx.createOscillator();
-    const oscGain = audioCtx.createGain();
-    
-    const currentVol = volSlider ? parseFloat(volSlider.value) : 0.1;
-    oscGain.gain.value = currentVol; 
-    
-    osc.connect(oscGain);
-    oscGain.connect(audioCtx.destination);
-
-    const startTime = audioCtx.currentTime;
-
-
-
-    osc.frequency.setValueAtTime(FREQ_START, startTime);
-    for (let i = 0; i < binaryStr.length; i++) {
-        const bit = binaryStr[i];
-        const time = startTime + BIT_DURATION + (i * BIT_DURATION);
-        osc.frequency.setValueAtTime((bit === '1' ? FREQ_1 : FREQ_0), time);
+    // BGMボタン
+    if (bgmBtn) {
+        bgmBtn.addEventListener('click', async () => {
+            await initAudio(); 
+            isBgmOn = !isBgmOn;
+            if (isBgmOn) {
+                bgmBtn.textContent = "🎵 BGM: ON";
+                bgmBtn.style.backgroundColor = "#63D2B0";
+                bgmBtn.style.color = "white";
+                if (isPlaying && bgmPlayer && bgmPlayer.loaded) bgmPlayer.start();
+            } else {
+                bgmBtn.textContent = "🎵 BGM: OFF";
+                bgmBtn.style.backgroundColor = "#ddd";
+                bgmBtn.style.color = "black";
+                if (bgmPlayer) bgmPlayer.stop();
+            }
+        });
     }
 
+    function stopAttendance() {
+        if (sequenceLoop) { sequenceLoop.stop(); sequenceLoop.dispose(); sequenceLoop = null; }
+        if (bgmPlayer) bgmPlayer.stop();
+        Tone.Transport.stop();
+        isPlaying = false;
 
-    const totalDuration = BIT_DURATION + (binaryStr.length * BIT_DURATION);
-    const endTime = startTime + totalDuration;
-
-
-
-    osc.start(startTime);
-    osc.stop(endTime);
-    
-    osc.onended = () => {
-        osc = null;
-        if (isScanning) {
-            nextSignalTimer = setTimeout(() => {
-                playSignalRecursive(binaryStr);
-            }, LOOP_GAP_SEC * 1000);
-        }
-    };
-}
-
-function stopSound() {
-    isScanning = false;
-    if (nextSignalTimer) {
-        clearTimeout(nextSignalTimer);
-        nextSignalTimer = null;
-
-
-
+        startBtn.textContent = "出席確認";
+        startBtn.style.backgroundColor = ""; 
+        startBtn.disabled = false;
+        classSelect.disabled = false;
+        
+        statusMessage.textContent = "待機中";
+        statusMessage.style.color = "#666";
+        otpNumberDisplay.textContent = "----";
     }
-    if(osc) { try{ osc.stop(); }catch(e){} osc = null; }
-    if(bgmSource) { try{ bgmSource.stop(); }catch(e){} bgmSource = null; }
-    
-    bgmGainNode = null;
-    stopScanningUI();
-}
+});
