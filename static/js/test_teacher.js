@@ -1,256 +1,187 @@
-let audioCtx, analyser, dataArray;
-let isListening = false;
-let detectedBits = "";
-let state = "IDLE"; 
-let animationId = null; // ループ制御用
+document.addEventListener('DOMContentLoaded', () => {
+    // ==========================================
+    // 1. DOM要素の取得
+    // ==========================================
+    const startBtn = document.getElementById('submit-btn');
+    // test_teacher.htmlにはstop-btnがないため、作成するか、トグル動作にする必要があります。
+    // 今回は「出席確認」ボタンを押すと送信開始する仕様に合わせます。
+    
+    // HTMLのIDに合わせて取得
+    const volSlider = document.getElementById('signal-volume');
+    const volDisplay = document.getElementById('vol-display');
+    const bgmBtn = document.getElementById('bgm-toggle-btn');
+    const statusArea = document.getElementById('status-area');
 
-// ==========================================
-// 1. 設定値
-// ==========================================
-const BASE_START = 17000;
-const BASE_0     = 18000;
-const BASE_1     = 19000;
+    // ==========================================
+    // 2. 音響設定 (Tone.js)
+    // ==========================================
+    const FREQ_MARKER = 17000; 
+    const FREQ_BIT_0  = 18000; 
+    const FREQ_BIT_1  = 19000; 
+    const DURATION    = 0.5;   // 1ビットの長さ
+    const TONE_LENGTH = 0.4;   // 実際に鳴らす時間(歯切れよく)
 
-// 許容範囲
-const START_RANGE = 1000; 
-const STRICT_RANGE = 400; // 少し広げました (200->400)
+    // テスト用固定値
+    const FIXED_OTP_BINARY = "1111"; 
 
-// ターゲット周波数（キャリブレーションで更新）
-let targetStart = BASE_START;
-let target0     = BASE_0;
-let target1     = BASE_1;
+    let isPlaying = false;
+    let sequenceLoop = null;
+    let synth = null;
+    let bgmPlayer = null;
+    let isBgmOn = true; // HTMLの初期表示が「ON」なのでtrue開始
 
-// スタート検知用カウンター（誤作動防止）
-let startSignalCount = 0;
-const START_SIGNAL_THRESHOLD = 3; // 3回連続で検知したら開始
+    // 音響初期化
+    async function initAudio() {
+        await Tone.start();
 
-// テスト用正解
-const TARGET_BINARY = "1111";
-
-// UI要素
-const registerBtn = document.getElementById('register-btn');
-const statusMsg = document.getElementById('status-msg');
-const debugFreq = document.getElementById('debug-freq');
-const debugBits = document.getElementById('debug-bits');
-
-// --- イベントリスナー ---
-if (registerBtn) {
-    registerBtn.addEventListener('click', async () => {
-        if (registerBtn.classList.contains('is-processing')) return;
-        try {
-            await startMic();
-        } catch (e) {
-            alert("マイクエラー: " + e);
+        // 信号用シンセサイザー
+        if (!synth) {
+            synth = new Tone.Synth({
+                oscillator: { type: "sine" }, // 正弦波
+                envelope: {
+                    attack: 0.05,
+                    decay: 0.1,
+                    sustain: 0.8,
+                    release: 0.05
+                }
+            }).toDestination();
+            
+            // スライダーの値を適用 (0.0~1.0 を デシベルに変換するか、そのまま使うか)
+            // Tone.jsのvolumeはデシベル(-infinity ~ 0)が一般的ですが、
+            // 簡易的にゲイン調整として扱うため、ここではスライダー値を反映させます。
+            // ただし、直接 .volume.value に入れるにはデシベル変換が必要です。
+            // 0.1 (スライダー) -> -20dB くらい。
+            updateVolume(volSlider.value);
         }
-    });
-}
 
-// --- 音響処理 ---
-async function startMic() {
-    // ★修正点: 二重起動防止
-    if (isListening) {
-        cancelAnimationFrame(animationId);
-        if (audioCtx) {
-            await audioCtx.close();
-        }
-        isListening = false;
-    }
-
-    registerBtn.textContent = '信号待機中...';
-    registerBtn.classList.add('is-processing');
-    updateStatus("マイク起動: '1111'を待っています", "black");
-    if(debugBits) debugBits.innerText = "";
-
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // iOS対策
-    const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
-    const source = audioCtx.createBufferSource();
-    source.buffer = emptyBuffer;
-    source.connect(audioCtx.destination);
-    source.start(0);
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
-    });
-    const mediaSource = audioCtx.createMediaStreamSource(stream);
-    analyser = audioCtx.createAnalyser();
-    
-    // 精度重視の設定
-    analyser.fftSize = 4096; 
-    analyser.smoothingTimeConstant = 0; // 反応速度最優先
-
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = 15000;
-    mediaSource.connect(filter);
-    filter.connect(analyser);
-    
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    isListening = true;
-    state = "IDLE";
-    startSignalCount = 0; // カウンタリセット
-    
-    updateLoop();
-}
-
-function getDominantFrequency() {
-    analyser.getByteFrequencyData(dataArray);
-    let maxVal = 0;
-    let maxIndex = 0;
-    const nyquist = audioCtx.sampleRate / 2;
-    const minIndex = Math.floor(15000 * dataArray.length / nyquist);
-
-    for (let i = minIndex; i < dataArray.length; i++) {
-        if (dataArray[i] > maxVal) {
-            maxVal = dataArray[i];
-            maxIndex = i;
+        // BGMプレイヤー
+        if (!bgmPlayer) {
+            bgmPlayer = new Tone.Player({
+                url: "/static/sounds/bgm.wav", 
+                loop: true,
+                volume: -15, // BGMは控えめに
+                onload: () => {
+                    console.log("BGM Loaded");
+                }
+            }).toDestination();
         }
     }
-    
-    // これで「1:0, 0:1」のようなサンプル不足を防ぎます
-    if (maxVal < 10) return 0; 
-    return maxIndex * nyquist / dataArray.length;
-}
 
-function updateLoop() {
-    if (!isListening) return;
-    animationId = requestAnimationFrame(updateLoop);
-    
-    const freq = getDominantFrequency();
-    
-    if (debugFreq) {
-        debugFreq.innerText = Math.round(freq) + " Hz";
-        // 色付け
-        if (Math.abs(freq - targetStart) < STRICT_RANGE) debugFreq.style.color = "green";
-        else if (Math.abs(freq - target1) < STRICT_RANGE) debugFreq.style.color = "red";
-        else if (Math.abs(freq - target0) < STRICT_RANGE) debugFreq.style.color = "blue";
-        else debugFreq.style.color = "#ccc";
-    }
-
-    if (state === "IDLE") {
-        // ★修正点: スタート信号の連続検知チェック
-        // 一瞬のノイズで反応しないようにする
-        if (freq > (BASE_START - START_RANGE) && freq < (BASE_START + START_RANGE)) {
-            startSignalCount++;
+    // 音量更新ロジック
+    function updateVolume(val) {
+        if (!synth) return;
+        // 入力 0.0〜1.0 を デシベル -60〜0 にマッピングする簡易計算
+        // 0ならミュート(-Infinity)
+        if (val <= 0) {
+            synth.volume.value = -100;
         } else {
-            startSignalCount = 0; // 途切れたらリセット
+            // 20 * log10(val) がデシベル変換の基本
+            // 例: 0.1 -> -20dB, 1.0 -> 0dB
+            const db = 20 * Math.log10(val);
+            synth.volume.rampTo(db, 0.1);
         }
+        if (volDisplay) volDisplay.textContent = val;
+    }
 
-        if (startSignalCount > START_SIGNAL_THRESHOLD) {
-            // キャリブレーション (現在の周波数との差分をとる)
-            const offset = freq - BASE_START;
-            targetStart = freq;
-            target0     = BASE_0 + offset;
-            target1     = BASE_1 + offset;
-            
-            console.log(`🚀 START CONFIRMED: ${Math.round(freq)}Hz (Offset: ${Math.round(offset)})`);
-            updateStatus(`受信開始 (補正:${Math.round(offset)}Hz)`, "green");
-            
-            startSignalCount = 0;
-            startReceivingSequence();
+    // OTP再生パターン
+    function playSoundPattern(binaryStr) {
+        // マーカー + 4ビット + 2.0秒休止
+        const totalDuration = (1 + 4) * DURATION + 2.0; 
+
+        sequenceLoop = new Tone.Loop((time) => {
+            // 1. 開始合図
+            synth.triggerAttackRelease(FREQ_MARKER, TONE_LENGTH, time);
+
+            // 2. データビット
+            for (let i = 0; i < 4; i++) {
+                const bit = binaryStr[i];
+                const freq = (bit === '1') ? FREQ_BIT_1 : FREQ_BIT_0;
+                const noteTime = time + ((i + 1) * DURATION);
+                synth.triggerAttackRelease(freq, TONE_LENGTH, noteTime);
+            }
+        }, totalDuration).start(0);
+
+        Tone.Transport.start();
+        isPlaying = true;
+
+        // BGM再生
+        if (isBgmOn && bgmPlayer && bgmPlayer.loaded) {
+            bgmPlayer.start();
         }
     }
-}
 
-async function startReceivingSequence() {
-    if (state !== "IDLE") return;
-    state = "RECEIVING";
-    detectedBits = "";
+    // ==========================================
+    // 3. イベントリスナー
+    // ==========================================
 
-    // ★修正点: 待機時間の調整
-    // スタート音が終わるのを待ち、最初のビット(0.5s後)の真ん中を狙う
-    // 800ms待機
-    await sleep(800); 
+    // ▼ 送信ボタン
+    if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+            // 既に再生中なら停止する（トグル動作）
+            if (isPlaying) {
+                stopAttendance();
+                return;
+            }
 
-    // 4ビット受信
-    for (let i = 1; i <= 4; i++) {
-        const bit = await sampleBit();
-        detectedBits += bit;
-        
-        if(debugBits) debugBits.innerText += bit + " ";
-        console.log(`Bit ${i}: ${bit}`);
-        
-        // 次のビットの真ん中まで待機
-        // sampleBit(300ms) + 待機(200ms) = 500ms周期
-        await sleep(200); 
+            try {
+                await initAudio();
+                
+                // UI変更
+                startBtn.textContent = "停止";
+                startBtn.style.backgroundColor = "#ff6b6b"; // 赤色に
+                if (statusArea) statusArea.textContent = `送信中: ${FIXED_OTP_BINARY}`;
+
+                console.log(`Test Playing: ${FIXED_OTP_BINARY}`);
+                playSoundPattern(FIXED_OTP_BINARY);
+
+            } catch (e) {
+                alert("オーディオエラー: " + e);
+            }
+        });
     }
 
-    handleResult();
-}
+    // ▼ 音量スライダー
+    if (volSlider) {
+        volSlider.addEventListener('input', (e) => {
+            updateVolume(e.target.value);
+        });
+    }
 
-async function sampleBit() {
-    let score0 = 0;
-    let score1 = 0;
-    const samples = 10; 
-    const interval = 30; // 30ms * 10 = 300ms
+    // ▼ BGMボタン
+    if (bgmBtn) {
+        bgmBtn.addEventListener('click', async () => {
+            await initAudio(); // 初回クリック対策
+            isBgmOn = !isBgmOn;
 
-    for (let j = 0; j < samples; j++) {
-        const freq = getDominantFrequency();
-        
-        if (freq > 0) { // 無音以外を判定
-            const dist0 = Math.abs(freq - target0);
-            const dist1 = Math.abs(freq - target1);
+            if (isBgmOn) {
+                bgmBtn.textContent = "🎵 BGM: ON";
+                bgmBtn.style.backgroundColor = "#63D2B0";
+                // 送信中なら再生開始
+                if (isPlaying && bgmPlayer && bgmPlayer.loaded) bgmPlayer.start();
+            } else {
+                bgmBtn.textContent = "🎵 BGM: OFF";
+                bgmBtn.style.backgroundColor = "#95A5A6"; // グレー
+                if (bgmPlayer) bgmPlayer.stop();
+            }
+        });
+    }
 
-            // どちらに近いか
-            if (dist0 < dist1 && dist0 < STRICT_RANGE) score0++;
-            else if (dist1 < dist0 && dist1 < STRICT_RANGE) score1++;
+    // 停止処理
+    function stopAttendance() {
+        if (sequenceLoop) {
+            sequenceLoop.stop();
+            sequenceLoop.dispose();
+            sequenceLoop = null;
         }
-        await sleep(interval);
+        if (bgmPlayer) {
+            bgmPlayer.stop();
+        }
+        Tone.Transport.stop();
+        isPlaying = false;
+
+        // UI戻し
+        startBtn.textContent = "出席確認";
+        startBtn.style.backgroundColor = ""; // 元の色へ
+        if (statusArea) statusArea.textContent = "待機中";
     }
-
-    console.log(`Sampling: 1=${score1}, 0=${score0}`);
-
-    if (score1 > score0) return "1";
-    if (score0 > score1) return "0";
-    
-    // サンプル不足や同点の場合はエラー訂正
-    // テストなので 1 に倒してみる（本番ではエラー扱い推奨）
-    return (score1 + score0 === 0) ? "?" : "0"; 
-}
-
-async function handleResult() {
-    // 5桁になるのを防ぐため念のためスライス
-    const finalBits = detectedBits.slice(0, 4).replace(/\?/g, "0");
-    console.log("Final Result:", finalBits);
-
-    if (finalBits === TARGET_BINARY) {
-        alert("【テスト成功】\n正しく '1111' を受信しました！");
-        updateStatus("受信成功: 1111", "green");
-        if(debugBits) debugBits.innerHTML += "<br>✅ MATCHED!";
-        
-        // 成功したら停止
-        state = "IDLE";
-        isListening = false;
-        if(audioCtx) audioCtx.close(); // マイク解放
-        cancelAnimationFrame(animationId);
-        
-        registerBtn.classList.remove('is-processing');
-        registerBtn.textContent = '出席登録(テスト)';
-    } else {
-        updateStatus(`不一致: ${finalBits} -> クールダウン(3秒)...`, "red");
-        
-        // ★修正点: 確実に待機させる
-        state = "COOLDOWN";
-        await sleep(3000);
-        
-        console.log("Cooldown finished. Ready for next.");
-        updateStatus("信号待機中...", "black");
-        state = "IDLE"; 
-        startSignalCount = 0; // カウンタ念のためリセット
-        if(debugBits) debugBits.innerText = "";
-    }
-}
-
-function updateStatus(text, color) {
-    if(statusMsg) {
-        statusMsg.innerText = text;
-        statusMsg.style.color = color;
-        statusMsg.style.fontWeight = "bold";
-    }
-}
-
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+});
