@@ -1,13 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // ==========================================
     // 1. UI要素の取得
+    // ==========================================
     const startBtn = document.getElementById('submit-btn');
-    const otpNumberDisplay = document.getElementById('otp-number');
-    const statusMessage = document.getElementById('status-message');
+    // HTMLにある "status-area" を取得します
+    const statusArea = document.getElementById('status-area');
 
-    // HTMLから探すのをやめる（エラー回避）
-    // const classIdInput = document.getElementById('target-class-id'); 
-
+    // ==========================================
     // 2. 音響設定
+    // ==========================================
     const FREQ_MARKER = 17000; 
     const FREQ_BIT_0  = 18000; 
     const FREQ_BIT_1  = 19000; 
@@ -45,23 +46,43 @@ document.addEventListener('DOMContentLoaded', () => {
         isPlaying = true;
     }
 
+    // ★画面表示を更新する関数
+    function updateDisplay(msg, otp = null, color = "#666") {
+        if (!statusArea) return;
+
+        // OTPがある場合は大きく表示、なければメッセージのみ
+        if (otp !== null) {
+            statusArea.innerHTML = `
+                <div style="font-size: 3rem; font-weight: bold; color: #333; margin-bottom: 10px;">${otp}</div>
+                <div style="font-size: 1.2rem; color: ${color};">${msg}</div>
+            `;
+        } else {
+            statusArea.innerHTML = `<div style="font-size: 1.2rem; color: ${color};">${msg}</div>`;
+        }
+    }
+
+    // ==========================================
+    // 3. イベント処理
+    // ==========================================
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
+            // 停止処理
             if (isPlaying) {
                 stopAttendance();
                 return;
             }
 
-            // ★修正: デモ用にクラスIDを「1」で固定する
-            // これにより、HTML側に何もなくてもエラーになりません
+            // ★クラスID固定 (デモ用: 1)
             const classId = 1; 
 
             try {
                 await initAudio(); 
 
+                // ボタン無効化・準備中表示
                 startBtn.disabled = true;
-                statusMessage.textContent = "OTP取得中...";
+                updateDisplay("OTP取得中...");
 
+                // APIコール
                 const res = await fetch('/api/generate_otp', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -71,13 +92,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!res.ok) throw new Error("API Error");
                 const data = await res.json();
                 
-                const otpDisplay = data.otp_display; 
-                const otpBinary  = data.otp_binary;  
+                const otpDisplay = data.otp_display; // 表示用 (例: 10)
+                const otpBinary  = data.otp_binary;  // 音響用 (例: 1010)
 
-                otpNumberDisplay.textContent = otpDisplay;
-                statusMessage.textContent = "信号送信中...";
-                statusMessage.style.color = "#E74C3C";
+                // 送信中表示
+                updateDisplay("信号送信中...", otpDisplay, "#E74C3C");
 
+                // ボタンを「停止」に変更
                 startBtn.textContent = "停止";
                 startBtn.style.backgroundColor = "#ff6b6b"; 
                 startBtn.disabled = false;
@@ -91,6 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 stopAttendance();
             }
         });
+    } else {
+        console.error("エラー: 'submit-btn' が見つかりません");
     }
 
     function stopAttendance() {
@@ -102,12 +125,13 @@ document.addEventListener('DOMContentLoaded', () => {
         Tone.Transport.stop();
         isPlaying = false;
 
-        startBtn.textContent = "出席確認";
-        startBtn.style.backgroundColor = ""; 
-        startBtn.disabled = false;
+        if (startBtn) {
+            startBtn.textContent = "出席確認";
+            startBtn.style.backgroundColor = ""; 
+            startBtn.disabled = false;
+        }
         
-        statusMessage.textContent = "待機中";
-        statusMessage.style.color = "#666";
-        otpNumberDisplay.textContent = "----";
+        // 待機中表示に戻す
+        updateDisplay("待機中");
     }
 });
