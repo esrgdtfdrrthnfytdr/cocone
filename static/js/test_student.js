@@ -5,29 +5,25 @@ let state = "IDLE";
 let animationId = null; 
 
 // ==========================================
-// 1. 設定値 (環境に合わせて調整済み)
+// 1. 設定値
 // ==========================================
 const BASE_START = 17000;
 const BASE_0     = 18000;
 const BASE_1     = 19000;
 
-// ★修正1: スタート待ち受け範囲を狭める (Bit0誤検知防止)
-// 以前は1000でしたが、Bit0(18000)と被らないよう 400 に狭めます
+// ★椅子の音対策: 範囲は狭いまま維持 (誤検知防止の要)
 const START_RANGE = 400; 
-
-// ビット判定の許容範囲 (キャリブレーション後)
 const STRICT_RANGE = 400; 
 
-// キャリブレーション用変数
 let targetStart = BASE_START;
 let target0     = BASE_0;
 let target1     = BASE_1;
-let signalBaseVolume = 0; // 基準となる信号強度
+let signalBaseVolume = 0; 
 
-// ★修正2: スタート検知の厳格化 (椅子音対策)
-// 3フレーム(約0.05秒) -> 15フレーム(約0.25秒) に変更
-// 継続して鳴り続けないと「スタート」と認めない
-const START_SIGNAL_THRESHOLD = 15; 
+// ★修正1: スタート検知の閾値を緩和
+// 15回(0.25s)だと遅すぎるため、6回(0.1s)程度に戻す
+// 範囲(START_RANGE)を狭めているので、これでも誤検知は防げます
+const START_SIGNAL_THRESHOLD = 6; 
 let startSignalCount = 0;
 
 // 正解定義
@@ -61,7 +57,7 @@ async function startMic() {
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
-    // iOS/Androidのスリープ防止用ハック (無音再生)
+    // iOS/Androidスリープ対策
     const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
     const source = audioCtx.createBufferSource();
     source.buffer = emptyBuffer;
@@ -70,11 +66,7 @@ async function startMic() {
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { 
-            echoCancellation: false, 
-            noiseSuppression: false, // ノイズ抑制はOFF推奨（信号も消えるため）
-            autoGainControl: false   // 勝手に音量が変わると困るのでOFF
-        } 
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
     });
     const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
@@ -97,7 +89,6 @@ async function startMic() {
     updateLoop();
 }
 
-// 周波数と音量を取得
 function getDominantFreqAndVol() {
     analyser.getByteFrequencyData(dataArray);
     let maxVal = 0;
@@ -127,7 +118,6 @@ function updateLoop() {
             debugFreq.style.color = "#ccc";
         } else {
             debugFreq.innerText = `${Math.round(freq)} Hz (Lv:${vol})`;
-            // ターゲット判定色分け
             if (Math.abs(freq - targetStart) < STRICT_RANGE) debugFreq.style.color = "green";
             else if (Math.abs(freq - target1) < STRICT_RANGE) debugFreq.style.color = "red";
             else if (Math.abs(freq - target0) < STRICT_RANGE) debugFreq.style.color = "blue";
@@ -135,25 +125,22 @@ function updateLoop() {
         }
     }
 
-    // --- IDLE状態: スタート合図待ち ---
+    // --- IDLE状態 ---
     if (state === "IDLE") {
-        // 条件: 音量が十分あり、周波数が17000Hz付近であること
-        // ★修正: 範囲を ±400Hz に狭めて誤検知を減らす
+        // スタート検知
         if (vol > 15 && Math.abs(freq - BASE_START) < START_RANGE) {
             startSignalCount++;
         } else {
-            // 途切れたら即リセット (椅子の音対策)
             startSignalCount = 0;
         }
 
-        // ★修正: 閾値を 15 (約0.25秒) に増やして、瞬発ノイズを無視
         if (startSignalCount > START_SIGNAL_THRESHOLD) {
             // キャリブレーション
             const offset = freq - BASE_START;
             targetStart = freq;
             target0     = BASE_0 + offset;
             target1     = BASE_1 + offset;
-            signalBaseVolume = vol; // 基準音量を保存
+            signalBaseVolume = vol; 
 
             console.log(`🚀 START LOCKED: ${Math.round(freq)}Hz (Offset: ${Math.round(offset)})`);
             updateStatus(`受信開始...`, "green");
@@ -169,13 +156,16 @@ async function startReceivingSequence() {
     state = "RECEIVING";
     detectedBits = "";
 
-    // 時間管理開始
     const startTime = performance.now(); 
     
-    // 最初のビット読み取りタイミング (0.8秒後)
-    const firstBitOffset = 800; 
+    // ★修正2: 最初のビットまでの待機時間を短縮
+    // Start音(0.5s)の終わりから、Bit0の中心(0.25s)までは合計0.75s。
+    // しかし検知までに約0.15s経過しているため、残り待機時間は 0.6s (600ms) 弱が適切。
+    // マージンを見て 550ms に設定します。
+    const firstBitOffset = 550; 
 
     for (let i = 1; i <= 4; i++) {
+        // 次のターゲット時刻
         const targetTime = startTime + firstBitOffset + ((i - 1) * 500);
         const waitTime = targetTime - performance.now();
         
@@ -183,10 +173,9 @@ async function startReceivingSequence() {
 
         const bit = await sampleBit();
         
-        // エラーなら即中断
         if (bit === "ERROR") {
             console.warn(`Bit ${i} Lost. Aborting.`);
-            handleResult(true, ""); 
+            handleResult(true, detectedBits); // エラー時は途中経過を渡す
             return;
         }
 
@@ -198,7 +187,6 @@ async function startReceivingSequence() {
     handleResult(false, detectedBits);
 }
 
-// サンプリング処理
 async function sampleBit() {
     let score0 = 0;
     let score1 = 0;
@@ -210,11 +198,8 @@ async function sampleBit() {
     for (let j = 0; j < samples; j++) {
         const { freq, vol } = getDominantFreqAndVol();
         
-        // ★修正: 相対音量チェック
-        // 「スタート合図の音量」の30%以上出ているか？ (距離対策)
-        // かつ、最低限のノイズ閾値(10)を超えているか
+        // 相対音量チェック
         if (vol > 10 && vol > (signalBaseVolume * 0.3)) {
-            
             const dist0 = Math.abs(freq - target0);
             const dist1 = Math.abs(freq - target1);
 
@@ -230,25 +215,21 @@ async function sampleBit() {
 
     console.log(`Sampled: 1=${score1}, 0=${score0}, Valid=${validSamples}`);
 
-    // 有効サンプルが少なすぎる場合はエラー
     if (validSamples < 4) return "ERROR";
-
     if (score1 > score0 + 1) return "1";
     if (score0 > score1 + 1) return "0";
-
-    return "ERROR"; // 僅差の場合はエラー
+    return "ERROR";
 }
 
 async function handleResult(isAborted, resultBits) {
     if (isAborted) {
-        updateStatus("信号ロスト: 再試行します...", "red");
-        // ロスト時は少し長めに待って、前の信号が消えるのを待つ
+        // エラー中断時の表示
+        updateStatus(`信号ロスト(受信:${resultBits})...`, "red");
         state = "COOLDOWN";
         await sleep(2000);
     } else {
         console.log("Result:", resultBits);
         
-        // 成功判定
         if (resultBits === TARGET_BINARY_1 || resultBits === TARGET_BINARY_0) {
             alert(`【テスト成功】\n受信成功: ${resultBits}`);
             updateStatus(`受信成功: ${resultBits}`, "green");
