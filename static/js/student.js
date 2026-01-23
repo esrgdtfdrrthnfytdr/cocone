@@ -4,7 +4,7 @@ let detectedBits = "";
 let state = "IDLE"; 
 let animationId = null; 
 
-// === 設定値 (テスト成功済みの値) ===
+// === 設定値 (テストで調整済み) ===
 const BASE_START = 17000;
 const BASE_0     = 18000;
 const BASE_1     = 19000;
@@ -17,26 +17,20 @@ let target0     = BASE_0;
 let target1     = BASE_1;
 let signalBaseVolume = 0; 
 let startSignalCount = 0;
-const START_SIGNAL_THRESHOLD = 6; // 0.1秒程度の継続で検知
+const START_SIGNAL_THRESHOLD = 6; 
 
 // UI要素
-const registerBtn = document.getElementById('register-btn'); // 「出席登録」ボタン
-const statusMsg = document.getElementById('status-message'); // もしあれば
+const registerBtn = document.getElementById('register-btn'); 
+const statusMsg = document.getElementById('status-msg'); // 修正: HTML側のIDを確認
 
-// --- イベントリスナー ---
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
         if (registerBtn.classList.contains('is-processing')) return;
-        try {
-            await startMic();
-        } catch (e) {
-            alert("マイクエラー: " + e);
-        }
+        try { await startMic(); } catch (e) { alert("マイクエラー: " + e); }
     });
 }
 
 async function startMic() {
-    // 二重起動防止
     if (isListening) {
         cancelAnimationFrame(animationId);
         if (audioCtx) await audioCtx.close();
@@ -48,7 +42,7 @@ async function startMic() {
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
-    // スマホのスリープ対策(無音再生)
+    // スマホのスリープ対策
     const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
     const source = audioCtx.createBufferSource();
     source.buffer = emptyBuffer;
@@ -97,7 +91,6 @@ function updateLoop() {
     const { freq, vol } = getDominantFreqAndVol();
 
     if (state === "IDLE") {
-        // スタート検知
         if (vol > 15 && Math.abs(freq - BASE_START) < START_RANGE) {
             startSignalCount++;
         } else {
@@ -105,7 +98,6 @@ function updateLoop() {
         }
 
         if (startSignalCount > START_SIGNAL_THRESHOLD) {
-            // キャリブレーション
             const offset = freq - BASE_START;
             targetStart = freq;
             target0     = BASE_0 + offset;
@@ -127,7 +119,7 @@ async function startReceivingSequence() {
     detectedBits = "";
 
     const startTime = performance.now(); 
-    const firstBitOffset = 550; // テストで調整した最適値
+    const firstBitOffset = 550; 
 
     for (let i = 1; i <= 4; i++) {
         const targetTime = startTime + firstBitOffset + ((i - 1) * 500);
@@ -137,7 +129,6 @@ async function startReceivingSequence() {
         const bit = await sampleBit();
         
         if (bit === "ERROR") {
-            // エラー時はAPIに送らずリセット
             console.warn("Signal Lost");
             handleResult(true, ""); 
             return;
@@ -157,7 +148,6 @@ async function sampleBit() {
 
     for (let j = 0; j < samples; j++) {
         const { freq, vol } = getDominantFreqAndVol();
-        // 相対音量チェック
         if (vol > 10 && vol > (signalBaseVolume * 0.3)) {
             const dist0 = Math.abs(freq - target0);
             const dist1 = Math.abs(freq - target1);
@@ -175,17 +165,14 @@ async function sampleBit() {
 
 async function handleResult(isAborted, resultBits) {
     if (isAborted) {
-        // 失敗時: 再挑戦させるためにIDLEへ
         if(statusMsg) statusMsg.textContent = "信号が不明瞭でした。再受信します...";
         state = "COOLDOWN";
         await sleep(2000);
         state = "IDLE";
     } else {
-        // 成功時: APIへ送信！
         console.log("Bits:", resultBits);
         await submitAttendance(resultBits);
         
-        // 完了後は停止
         state = "IDLE";
         isListening = false;
         if(audioCtx) audioCtx.close(); 
@@ -195,24 +182,19 @@ async function handleResult(isAborted, resultBits) {
     }
 }
 
-// API送信ロジック
+// API送信
 async function submitAttendance(bits) {
-    // URLからstudent_idを取得する等の処理が元々あった場合はここに記述
-    // 今回はHTML内のhidden input等から取ると仮定、あるいはセッション依存ならそのまま
-    // 元のstudent.jsの実装に合わせて student_id を取得してください
-    // ここではデモとして、URLパラメータやDOMから取る例を書きます:
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentId = urlParams.get('student_id') || "dummy_id"; // 仮
-
-    // 2進数文字列を数値に変換 (例: "1010" -> 10)
     const otpVal = parseInt(bits, 2);
+    // student_idはセッションやDOMから取得する必要があります。
+    // 以下は仮の実装です。必要に応じて調整してください。
+    const studentId = "dummy_student"; 
 
     try {
         const response = await fetch('/api/check_attend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                student_id: studentId, // 必要に応じて調整
+                student_id: studentId, 
                 otp_match: otpVal
             })
         });
