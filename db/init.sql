@@ -1,15 +1,16 @@
 -- ==========================================
--- 初期化用スクリプト (クラス単位出席版)
+-- 初期化用スクリプト (修正・完全版)
 -- ==========================================
 
--- 1. リセット
+-- 1. リセット (依存関係があるため順序に注意)
 DROP VIEW IF EXISTS attendance_book_view CASCADE;
 DROP TABLE IF EXISTS attendance_results CASCADE;
 DROP TABLE IF EXISTS class_sessions CASCADE;
-DROP TABLE IF EXISTS courses CASCADE; -- 科目テーブルは廃止
-DROP TABLE IF EXISTS classes CASCADE; -- 新しく作るため一旦削除
 DROP TABLE IF EXISTS students CASCADE;
+DROP TABLE IF EXISTS classes CASCADE;
 DROP TABLE IF EXISTS teachers CASCADE;
+-- 古いテーブルが残っている場合のために念のため削除
+DROP TABLE IF EXISTS courses CASCADE;
 
 -- 2. テーブル作成
 
@@ -21,46 +22,47 @@ CREATE TABLE teachers (
     name TEXT NOT NULL
 );
 
--- ▼ 担当クラスマスタ (旧coursesから変更)
--- 先生が担任・担当しているクラスを管理します
+-- ▼ 担当クラスマスタ
 CREATE TABLE classes (
     class_id SERIAL PRIMARY KEY,
-    class_name TEXT NOT NULL,      -- クラス名 (例: R4A1, Aクラス)
+    class_name TEXT NOT NULL,
     teacher_id INT REFERENCES teachers(teacher_id)
 );
 
 -- ▼ 生徒マスタ
--- 1. 生徒テーブル（既存のまま）
 CREATE TABLE students (
     student_number TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
-    homeroom_class TEXT,           -- 生徒の所属クラス (例: R4A1)
+    homeroom_class TEXT,
     attendance_no INT
 );
 
--- 2. 授業セッションテーブル（授業の「1コマ」を管理）
--- 日付や時限、どのクラスの授業かなどを記録します
+-- ▼ 授業セッションテーブル (ここを修正しました)
+-- class_name を廃止し、class_id で紐付け
+-- sound_token (OTP) を追加
 CREATE TABLE class_sessions (
     session_id SERIAL PRIMARY KEY,
-    class_name TEXT NOT NULL,      -- クラス名 (students.homeroom_classと対応)
-    date DATE NOT NULL,            -- 授業日 (例: 2025-11-16)
-    period INT,                    -- 何コマ目か (例: 1)
+    class_id INT REFERENCES classes(class_id), -- ★修正: クラスIDで紐付け
+    date DATE NOT NULL,
+    period INT,
+    sound_token TEXT,                      -- ★追加: OTP保存用
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. 出席結果テーブル（「誰が」「どの授業に」「どうだったか」を記録）
+-- ▼ 出席結果テーブル
 CREATE TABLE attendance_results (
     result_id SERIAL PRIMARY KEY,
-    session_id INT REFERENCES class_sessions(session_id),    -- どの授業回か
-    student_number TEXT REFERENCES students(student_number), -- どの生徒か
-    status TEXT NOT NULL,          -- '出席', '欠席', '遅刻' など
-    note TEXT,                     -- 備考 (例: '電車遅延')
+    session_id INT REFERENCES class_sessions(session_id),
+    student_number TEXT REFERENCES students(student_number),
+    status TEXT NOT NULL,
+    note TEXT,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. ビュー作成 (出席簿)
+-- テーブル定義に合わせて結合条件を整理
 CREATE VIEW attendance_book_view AS
 SELECT
     ar.result_id,
@@ -70,7 +72,7 @@ SELECT
     s.name AS student_name,
     s.homeroom_class AS student_homeroom,
     t.name AS teacher_name,
-    c.class_name AS target_class, -- 出席を取ったクラス名
+    c.class_name AS target_class,
     cs.date AS session_date
 FROM attendance_results ar
 JOIN students s ON ar.student_number = s.student_number
