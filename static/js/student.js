@@ -195,13 +195,16 @@ async function submitAttendance(bits) {
             })
         });
         
-        const result = await response.json();
-        if (result.status === 'success') {
-            alert("出席登録が完了しました！");
-            if(statusMsg) statusMsg.textContent = "登録完了";
+        if (result.status === "success") {
+            // 成功時
+            if (modal) modal.classList.add('active');
+            if(statusMsg) statusMsg.innerText = "登録完了";
+            if(debugBits) debugBits.innerHTML += "<br><span style='color:green; font-weight:bold;'>[OK] 出席完了</span>";
         } else {
-            alert("エラー: " + result.message);
-            if(statusMsg) statusMsg.textContent = "登録失敗: " + result.message;
+            // 失敗時
+            alert(`コード不一致 (受信:${val})`);
+            if(debugBits) debugBits.innerHTML += "<br><span style='color:red; font-weight:bold;'>[NG] 不一致</span>";
+            resetUI();
         }
     } catch (e) {
         alert("通信エラー: " + e);
