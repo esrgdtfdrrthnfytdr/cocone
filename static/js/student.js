@@ -194,8 +194,8 @@ async function submitAttendance(bits) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                student_id: studentId, 
-                otp_match: otpVal
+                
+                otp_value: otpVal 
             })
         });
         
@@ -210,8 +210,4 @@ async function submitAttendance(bits) {
     } catch (e) {
         alert("通信エラー: " + e);
     }
-}
-
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }
