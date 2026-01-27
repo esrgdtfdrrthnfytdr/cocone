@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusArea = document.getElementById('status-area');
 
     // ==========================================
-    // 2. 音響設定
+    // 2. 音響設定 (BGM + 信号)
     // ==========================================
     const FREQ_MARKER = 17000; 
     const FREQ_BIT_0  = 18000; 
@@ -17,9 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPlaying = false;
     let sequenceLoop = null;
     let synth = null;
+    let bgmPlayer = null; // ★BGM用の変数を追加
 
     async function initAudio() {
         await Tone.start();
+        
+        // 信号用のシンセサイザー
         if (!synth) {
             synth = new Tone.Synth({
                 oscillator: { type: "sine" },
@@ -28,15 +31,26 @@ document.addEventListener('DOMContentLoaded', () => {
             synth.volume.value = -5; 
         }
 
+        // ★BGMプレーヤーの初期化 (ここを復活！)
         if (!bgmPlayer) {
             bgmPlayer = new Tone.Player({
                 url: "/static/sounds/bgm.wav", 
-                loop: true, volume: -15
+                loop: true, 
+                volume: -15
             }).toDestination();
         }
+        
+        // 音声ファイルの読み込み待ち
+        await Tone.loaded();
     }
 
     function playSoundPattern(binaryStr) {
+        // ▼ BGM再生開始
+        if (bgmPlayer && bgmPlayer.loaded) {
+            bgmPlayer.start();
+        }
+
+        // 信号パターンのループ再生
         const totalDuration = (1 + 4) * DURATION + 2.0; 
         sequenceLoop = new Tone.Loop((time) => {
             synth.triggerAttackRelease(FREQ_MARKER, TONE_LENGTH, time);
@@ -74,11 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // ★修正箇所: IDを数字の 1 ではなく、文字列の "1" に変更します
-            const classId = "1"; 
+            const classId = "1"; // 文字列で指定
 
             try {
-                await initAudio(); 
+                updateDisplay("準備中...");
+                await initAudio(); // ここでBGMも読み込まれます
 
                 startBtn.disabled = true;
                 updateDisplay("OTP取得中...");
@@ -90,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (!res.ok) {
-                    // エラーの詳細をコンソールに出して確認しやすくする
                     const errData = await res.json();
                     console.error("API Detail Error:", errData);
                     throw new Error("API Error");
@@ -111,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error(err);
-                alert("エラー: 通信に失敗しました。コンソールを確認してください。");
+                alert("エラー: " + err.message);
                 stopAttendance();
             }
         });
@@ -120,11 +133,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopAttendance() {
+        // ループと信号の停止
         if (sequenceLoop) {
             sequenceLoop.stop();
             sequenceLoop.dispose();
             sequenceLoop = null;
         }
+        
+        // ★BGMの停止
+        if (bgmPlayer) {
+            bgmPlayer.stop();
+        }
+
         Tone.Transport.stop();
         isPlaying = false;
 
