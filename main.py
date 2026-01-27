@@ -306,6 +306,7 @@ async def generate_otp(req: GenerateOTPRequest):
         print(f"❌ OTP Error: {e}")
         return JSONResponse({"error": "Database error"}, status_code=500)
 
+# main.py の check_attend 関数全体をこれに置き換え
 @app.post("/api/check_attend")
 async def check_attend(req: CheckAttendRequest, request: Request):
     student_id = request.session.get("user_id")
@@ -313,20 +314,42 @@ async def check_attend(req: CheckAttendRequest, request: Request):
 
     try:
         with engine.begin() as conn:
-            sess = conn.execute(text("SELECT session_id, sound_token FROM class_sessions ORDER BY session_id DESC LIMIT 1")).fetchone()
+            # 1. 現在の最新の授業セッションを取得
+            sess = conn.execute(text("SELECT session_id, sound_token, period, date FROM class_sessions ORDER BY session_id DESC LIMIT 1")).fetchone()
             if not sess: return JSONResponse({"status": "error", "message": "授業なし"})
             
+            # 2. OTP照合
             if req.otp_value == int(sess.sound_token):
+                # 3. 出席データを登録
                 conn.execute(
                     text("INSERT INTO attendance_results (session_id, student_number, status, note) VALUES (:sid, :stu, '出席', 'アプリ')"),
                     {"sid": sess.session_id, "stu": student_id}
                 )
-                return JSONResponse({"status": "success", "message": "出席完了"})
+                
+                # 4. ▼▼▼ 表示用に生徒情報を取得 (ここを追加！) ▼▼▼
+                stu_info = conn.execute(
+                    text("SELECT name, attendance_no FROM students WHERE student_number = :sid"),
+                    {"sid": student_id}
+                ).fetchone()
+
+                # 日付のフォーマット (例: 11月25日)
+                disp_date = datetime.date.today().strftime('%m月%d日')
+
+                return JSONResponse({
+                    "status": "success",
+                    "message": "出席完了",
+                    "data": {
+                        "number": stu_info.attendance_no,
+                        "name": stu_info.name,
+                        "date": disp_date,
+                        "period": f"{sess.period}コマ目"
+                    }
+                })
             else:
                 return JSONResponse({"status": "error", "message": "コード不一致"})
     except Exception as e:
         print(f"❌ Check Error: {e}")
-        return JSONResponse({"status": "error", "message": "エラー発生"})
+        return JSONResponse({"status": "error", "message": "登録済み、またはエラー"})
 
 @app.post("/api/update_status")
 async def update_status(req: UpdateStatusRequest):

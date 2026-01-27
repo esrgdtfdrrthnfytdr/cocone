@@ -11,7 +11,7 @@ const BASE_1     = 19000;
 const START_RANGE = 400;   
 const STRICT_RANGE = 400; 
 
-// キャリブレーション用
+// キャリブレーション
 let targetStart = BASE_START;
 let target0     = BASE_0;
 let target1     = BASE_1;
@@ -19,9 +19,22 @@ let signalBaseVolume = 0;
 let startSignalCount = 0;
 const START_SIGNAL_THRESHOLD = 6; 
 
-// UI要素
+// UI要素 (前のバージョンのID名に合わせています)
 const registerBtn = document.getElementById('register-btn'); 
-const statusMsg = document.getElementById('status-msg');
+// ▼▼▼ ここを変更: HTMLのIDに合わせる ▼▼▼
+const modal = document.getElementById('completion-modal');
+const closeModalBtn = document.getElementById('modal-close-btn');
+
+// 閉じるボタン
+if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', () => {
+        if (modal) modal.classList.remove('active');
+        if (registerBtn) {
+            registerBtn.textContent = '出席登録';
+            registerBtn.classList.remove('is-processing');
+        }
+    });
+}
 
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
@@ -41,8 +54,6 @@ async function startMic() {
     registerBtn.classList.add('is-processing');
 
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // スマホのスリープ対策
     const emptyBuffer = audioCtx.createBuffer(1, 1, 22050);
     const source = audioCtx.createBufferSource();
     source.buffer = emptyBuffer;
@@ -55,7 +66,6 @@ async function startMic() {
     });
     const mediaSource = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
-    
     analyser.fftSize = 4096; 
     analyser.smoothingTimeConstant = 0; 
 
@@ -103,10 +113,6 @@ function updateLoop() {
             target0     = BASE_0 + offset;
             target1     = BASE_1 + offset;
             signalBaseVolume = vol;
-
-            console.log(`START: ${Math.round(freq)}Hz`);
-            if(statusMsg) statusMsg.textContent = "信号受信中...";
-            
             startSignalCount = 0;
             startReceivingSequence();
         }
@@ -124,18 +130,15 @@ async function startReceivingSequence() {
     for (let i = 1; i <= 4; i++) {
         const targetTime = startTime + firstBitOffset + ((i - 1) * 500);
         const waitTime = targetTime - performance.now();
-        if (waitTime > 0) await sleep(waitTime); // ★ここでエラーが出ていました
+        if (waitTime > 0) await sleep(waitTime);
 
         const bit = await sampleBit();
-        
         if (bit === "ERROR") {
-            console.warn("Signal Lost");
             handleResult(true, ""); 
             return;
         }
         detectedBits += bit;
     }
-
     handleResult(false, detectedBits);
 }
 
@@ -154,9 +157,8 @@ async function sampleBit() {
             if (dist0 < dist1 && dist0 < STRICT_RANGE) { score0++; validSamples++; }
             else if (dist1 < dist0 && dist1 < STRICT_RANGE) { score1++; validSamples++; }
         }
-        await sleep(interval); // ★ここでも使います
+        await sleep(interval);
     }
-
     if (validSamples < 4) return "ERROR";
     if (score1 > score0 + 1) return "1";
     if (score0 > score1 + 1) return "0";
@@ -165,53 +167,61 @@ async function sampleBit() {
 
 async function handleResult(isAborted, resultBits) {
     if (isAborted) {
-        if(statusMsg) statusMsg.textContent = "信号が不明瞭でした。再受信します...";
         state = "COOLDOWN";
         await sleep(2000);
         state = "IDLE";
     } else {
-        console.log("Bits:", resultBits);
         await submitAttendance(resultBits);
-        
         state = "IDLE";
         isListening = false;
         if(audioCtx) audioCtx.close(); 
         cancelAnimationFrame(animationId);
-        registerBtn.classList.remove('is-processing');
-        registerBtn.textContent = '出席登録';
     }
 }
 
 async function submitAttendance(bits) {
     const otpVal = parseInt(bits, 2);
-    // student_idはサーバー側のセッションから取得します
     
     try {
         const response = await fetch('/api/check_attend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                otp_value: otpVal  // ★修正済み: キー名をサーバーに合わせています
-            })
+            body: JSON.stringify({ otp_value: otpVal })
         });
         
-        if (result.status === "success") {
-            // 成功時
-            if (modal) modal.classList.add('active');
-            if(statusMsg) statusMsg.innerText = "登録完了";
-            if(debugBits) debugBits.innerHTML += "<br><span style='color:green; font-weight:bold;'>[OK] 出席完了</span>";
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            // ▼▼▼ 成功処理: データを画面に反映 ▼▼▼
+            if (modal) {
+                // サーバーから返ってきたデータがあればセットする
+                if (result.data) {
+                    const elNum = document.getElementById('modal-number');
+                    const elName = document.getElementById('modal-name');
+                    const elDate = document.getElementById('modal-date');
+                    const elPeriod = document.getElementById('modal-period');
+
+                    if (elNum) elNum.textContent = result.data.number;
+                    if (elName) elName.textContent = result.data.name;
+                    if (elDate) elDate.textContent = result.data.date;
+                    if (elPeriod) elPeriod.textContent = result.data.period;
+                }
+                modal.classList.add('active');
+            } else {
+                alert("出席登録完了！");
+            }
         } else {
-            // 失敗時
-            alert(`コード不一致 (受信:${val})`);
-            if(debugBits) debugBits.innerHTML += "<br><span style='color:red; font-weight:bold;'>[NG] 不一致</span>";
-            resetUI();
+            alert("エラー: " + result.message);
+            registerBtn.classList.remove('is-processing');
+            registerBtn.textContent = '出席登録';
         }
     } catch (e) {
         alert("通信エラー: " + e);
+        registerBtn.classList.remove('is-processing');
+        registerBtn.textContent = '出席登録';
     }
 }
 
-// ★★★ ここが消えていたためエラーになっていました ★★★
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
