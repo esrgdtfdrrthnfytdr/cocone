@@ -17,7 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPlaying = false;
     let sequenceLoop = null;
     let synth = null;
-    let bgmPlayer = null; // ★BGM用の変数を追加
+    
+    // ▼▼▼ ここが重要！変数の宣言 ▼▼▼
+    let bgmPlayer = null; 
 
     async function initAudio() {
         await Tone.start();
@@ -31,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
             synth.volume.value = -5; 
         }
 
-        // ★BGMプレーヤーの初期化 (ここを復活！)
+        // ★BGMプレーヤーの初期化
         if (!bgmPlayer) {
             bgmPlayer = new Tone.Player({
                 url: "/static/sounds/bgm.wav", 
