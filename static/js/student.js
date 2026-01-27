@@ -4,11 +4,11 @@ let detectedBits = "";
 let state = "IDLE"; 
 let animationId = null; 
 
-// === 設定値 (テストで調整済み) ===
+// === 設定値 ===
 const BASE_START = 17000;
 const BASE_0     = 18000;
 const BASE_1     = 19000;
-const START_RANGE = 400;   // 誤検知防止のため狭く
+const START_RANGE = 400;   
 const STRICT_RANGE = 400; 
 
 // キャリブレーション用
@@ -21,7 +21,7 @@ const START_SIGNAL_THRESHOLD = 6;
 
 // UI要素
 const registerBtn = document.getElementById('register-btn'); 
-const statusMsg = document.getElementById('status-msg'); // 修正: HTML側のIDを確認
+const statusMsg = document.getElementById('status-msg');
 
 if (registerBtn) {
     registerBtn.addEventListener('click', async () => {
@@ -124,7 +124,7 @@ async function startReceivingSequence() {
     for (let i = 1; i <= 4; i++) {
         const targetTime = startTime + firstBitOffset + ((i - 1) * 500);
         const waitTime = targetTime - performance.now();
-        if (waitTime > 0) await sleep(waitTime);
+        if (waitTime > 0) await sleep(waitTime); // ★ここでエラーが出ていました
 
         const bit = await sampleBit();
         
@@ -154,7 +154,7 @@ async function sampleBit() {
             if (dist0 < dist1 && dist0 < STRICT_RANGE) { score0++; validSamples++; }
             else if (dist1 < dist0 && dist1 < STRICT_RANGE) { score1++; validSamples++; }
         }
-        await sleep(interval);
+        await sleep(interval); // ★ここでも使います
     }
 
     if (validSamples < 4) return "ERROR";
@@ -182,20 +182,16 @@ async function handleResult(isAborted, resultBits) {
     }
 }
 
-// API送信
 async function submitAttendance(bits) {
     const otpVal = parseInt(bits, 2);
-    // student_idはセッションやDOMから取得する必要があります。
-    // 以下は仮の実装です。必要に応じて調整してください。
-    const studentId = "dummy_student"; 
-
+    // student_idはサーバー側のセッションから取得します
+    
     try {
         const response = await fetch('/api/check_attend', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                
-                otp_value: otpVal 
+                otp_value: otpVal  // ★修正済み: キー名をサーバーに合わせています
             })
         });
         
@@ -210,4 +206,9 @@ async function submitAttendance(bits) {
     } catch (e) {
         alert("通信エラー: " + e);
     }
+}
+
+// ★★★ ここが消えていたためエラーになっていました ★★★
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
