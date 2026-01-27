@@ -27,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }).toDestination();
             synth.volume.value = -5; 
         }
+
+        if (!bgmPlayer) {
+            bgmPlayer = new Tone.Player({
+                url: "/static/sounds/bgm.wav", 
+                loop: true, volume: -15
+            }).toDestination();
+        }
     }
 
     function playSoundPattern(binaryStr) {
