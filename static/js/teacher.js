@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let sequenceLoop = null;
     let synth = null;
     
-    // ▼▼▼ ここが重要！変数の宣言 ▼▼▼
     let bgmPlayer = null; 
 
     async function initAudio() {
@@ -38,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bgmPlayer = new Tone.Player({
                 url: "/static/sounds/bgm.wav", 
                 loop: true, 
-                volume: -15
+                volume: -8
             }).toDestination();
         }
         
