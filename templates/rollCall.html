@@ -7,37 +7,12 @@
 {% endblock %}
 
 {% block content %}
-    <h1>出席確認</h1>
-    <div class="form-container">
-    </div>
-
-    <button id="submit-btn" class="circle-button">出席確認</button>
-    <div id="status-area" style="margin-top:20px; color:#666;"></div>
-
-    <div id="completion-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h2>出席登録が完了しました！</h2>
-            <div class="attendance-details">
-                <div class="detail-row">
-                    <span class="detail-label">出席番号</span>
-                    <span id="modal-number" class="detail-value">--</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">氏名</span>
-                    <span id="modal-name" class="detail-value">----</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">登録日</span>
-                    <span id="modal-date" class="detail-value">--月--日</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">登録コマ</span>
-                    <span id="modal-period" class="detail-value">-コマ目</span>
-                </div>
-            </div>
-            <button id="modal-close-btn" class="modal-close-btn">閉じる</button>
+        <h1>出席確認</h1>
+        <div class="form-container">
         </div>
-    </div>
+
+        <button id="submit-btn" class="circle-button">出席確認</button>
+        <div id="status-area" style="margin-top:20px; color:#666;"></div>
 {% endblock %}
 
 {% block extra_js %}
