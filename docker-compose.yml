@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # === アプリ本体 (cocone) ===
+  app:
+    build: .
+    container_name: cocone_app
+    ports:
+      - "8000:8000"  # 外からの8000番を中の8000番に繋ぐ
+    volumes:
+      - .:/app       # ★ここが魔法！手元のファイルを中に同期させる設定
+    environment:
+      # DB接続先を 'localhost' ではなく 下のサービス名 'db' に変える
+      - DATABASE_URL=postgresql://cocone_user:cocone_pass@db:5432/cocone_db
+    depends_on:
+      - db
+    restart: always
+
+  # === データベース (PostgreSQL) ===
+  db:
+    image: postgres:13
+    container_name: cocone_db
+    environment:
+      - POSTGRES_USER=cocone_user
+      - POSTGRES_PASSWORD=cocone_pass
+      - POSTGRES_DB=cocone_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # 初期化SQLを自動実行 (dbフォルダがある想定)
+      - ./db:/docker-entrypoint-initdb.d
+    restart: always
+
+volumes:
+  postgres_data:
