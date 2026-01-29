@@ -6,9 +6,9 @@ services:
     build: .
     container_name: cocone_app
     ports:
-      - "8000:8000"  # 外からの8000番を中の8000番に繋ぐ
+      - "8000:8000"  # 外からの8000番 中の8000番
     volumes:
-      - .:/app       # ★ここが魔法！手元のファイルを中に同期させる設定
+      - .:/app       # 手元のファイルを中に同期させる設定
     environment:
       # DB接続先を 'localhost' ではなく 下のサービス名 'db' に変える
       - DATABASE_URL=postgresql://cocone_user:cocone_pass@db:5432/cocone_db
@@ -21,8 +21,8 @@ services:
     image: postgres:13
     container_name: cocone_db
     environment:
-      - POSTGRES_USER=cocone_user
-      - POSTGRES_PASSWORD=cocone_pass
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=iotiot
       - POSTGRES_DB=cocone_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
