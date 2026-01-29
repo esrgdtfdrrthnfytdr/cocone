@@ -11,7 +11,7 @@ services:
       - .:/app       # 手元のファイルを中に同期させる設定
     environment:
       # DB接続先を 'localhost' ではなく 下のサービス名 'db' に変える
-      - DATABASE_URL=postgresql://cocone_user:cocone_pass@db:5432/cocone_db
+      - DATABASE_URL=postgresql://postgres:iotiot@db:5432/cocone_db
     depends_on:
       - db
     restart: always

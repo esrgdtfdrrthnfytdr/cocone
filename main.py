@@ -29,8 +29,7 @@ templates = Jinja2Templates(directory="templates")
 
 # Docker環境なら環境変数を使い、なければlocalhost(手元用)を使う設定
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://cocone_user:cocone_pass@localhost/cocone_db")
-
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"options": "-c client_encoding=utf8"})
 
 class GenerateOTPRequest(BaseModel):
     class_id: Optional[str] = None
