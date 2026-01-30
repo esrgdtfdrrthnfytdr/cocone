@@ -290,8 +290,35 @@ async def user_management(request: Request):
 @app.get("/passwordChange", response_class=HTMLResponse)
 async def password_change(request: Request): return render_page(request, "passwordChange.html")
 
+#何コマ目か判定用の関数
+def get_current_period():
+    # Docker内の時間はUTC(世界標準時)なので、+9時間して日本時間にする
+    now = datetime.datetime.utcnow() + datetime.timedelta(hours=9)
+    current_time = now.time()
+
+    # 時間の定義 (HH, MM)
+    # 1コマ: 08:30 ~ 10:55
+    if datetime.time(8, 30) <= current_time < datetime.time(10, 55):
+        return 1
+    # 2コマ: 10:55 ~ 12:45 (昼休み入りまで)
+    elif datetime.time(10, 55) <= current_time < datetime.time(12, 45):
+        return 2
+    # 3コマ: 12:45 ~ 15:10
+    elif datetime.time(12, 45) <= current_time < datetime.time(15, 10):
+        return 3
+    # 4コマ: 15:10 ~ 18:00
+    elif datetime.time(15, 10) <= current_time < datetime.time(18, 00):
+        return 4
+    else:
+        return None # 範囲外
 @app.post("/api/generate_otp")
 async def generate_otp(req: GenerateOTPRequest):
+    period = get_current_period()
+    if period is None:
+        #１～４コマ目時間外はエラー防止のため1コマ目として扱う
+        print("⚠️ 授業時間外のため、強制的に1コマ目として扱います")
+        period = 1
+
     val = random.randint(0, 15)
     current_date = datetime.date.today().strftime('%Y-%m-%d')
     cid_val = int(req.class_id) if req.class_id and str(req.class_id).strip() else None
